@@ -83,13 +83,11 @@ std::string constraint_defect(const NodalMesh& mesh,
 /// set; `exact_pressure_area` overrides the mesh area for traction), falling back
 /// to an even split over `fallback_nodes` when no face has area. Prints one
 /// `load:` line to `report`; throws std::runtime_error prefixed `what` on failure.
-Eigen::VectorXd assemble_selection_load(const NodalMesh& mesh,
-                                        const std::vector<SurfaceFace>& faces,
-                                        std::span<const std::uint32_t> fallback_nodes,
-                                        const SurfaceLoadSpec& spec, const char* what,
-                                        std::FILE* report,
-                                        const std::optional<LoadRegion>& region,
-                                        std::optional<double> exact_pressure_area =
-                                            std::nullopt);
+Eigen::VectorXd
+assemble_selection_load(const NodalMesh& mesh, const std::vector<SurfaceFace>& faces,
+                        std::span<const std::uint32_t> fallback_nodes,
+                        const SurfaceLoadSpec& spec, const char* what, std::FILE* report,
+                        const std::optional<LoadRegion>& region,
+                        std::optional<double> exact_pressure_area = std::nullopt);
 
 } // namespace polymesh::fea

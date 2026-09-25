@@ -30,15 +30,15 @@ void snap_round(GradedFillState& s) {
     GradedTetFillOutput& out = s.out;
     const double hc = s.hc;
     progress.set_phase("projection_snap");
-    std::vector<std::uint32_t> snap_nodes =
-        tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
+    std::vector<std::uint32_t> snap_nodes = tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
     if (snap_nodes.empty()) {
         return;
     }
     const double vol_eps = 1e-14 * hc * hc * hc;
     std::vector<char> on_boundary(out.mesh.nodes.size(), 0);
     for (std::size_t work_done = 0; const auto ni : snap_nodes) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, snap_nodes.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, snap_nodes.size());
         on_boundary[ni] = 1;
     }
     // The bad-cell test: inverted is always bad; below the shared shape
@@ -59,8 +59,8 @@ void snap_round(GradedFillState& s) {
         if (validity::tet_shape_quality(a, b, c, d) >= validity::kCellShapeFloor) {
             return false;
         }
-        return on_boundary[n[0]] != 0 && on_boundary[n[1]] != 0 &&
-               on_boundary[n[2]] != 0 && on_boundary[n[3]] != 0;
+        return on_boundary[n[0]] != 0 && on_boundary[n[1]] != 0 && on_boundary[n[2]] != 0 &&
+               on_boundary[n[3]] != 0;
     };
     // Node -> incident tets, so the snap line-searches ONE node against its
     // own star instead of rescanning the mesh (same wiring as tet_fill).
@@ -92,7 +92,7 @@ void snap_round(GradedFillState& s) {
     }
     const auto node_offends = [&](std::uint32_t ni) {
         for (const auto ti : incident[ni]) {
-        fill_progress_poll();
+            fill_progress_poll();
             if (tet_is_bad(out.mesh.tets[ti])) {
                 return true;
             }
@@ -131,8 +131,8 @@ void snap_round(GradedFillState& s) {
     // placement never changes — only their spacing).
     const auto reproject = [&](std::uint32_t ni, const Eigen::Vector3d& p) {
         if (projection == nullptr) {
-            return mirror_unfold(
-                mirror, closest_on_surface(surface, mirror_fold(mirror, p)).point, p);
+            return mirror_unfold(mirror,
+                                 closest_on_surface(surface, mirror_fold(mirror, p)).point, p);
         }
         const auto target = boundary_projection_target(surface, p, ni, projection, mirror);
         return target ? target->point : p;
@@ -189,8 +189,7 @@ void snap_round(GradedFillState& s) {
                 saved.push_back(out.mesh.nodes[node]);
                 const Eigen::Vector3d step = 0.5 * (centroid - saved.back());
                 const double len = step.norm();
-                Eigen::Vector3d trial =
-                    saved.back() + (len > cap ? step * (cap / len) : step);
+                Eigen::Vector3d trial = saved.back() + (len > cap ? step * (cap / len) : step);
                 if (tangential) {
                     trial = reproject(node, trial);
                     if ((trial - saved.back()).norm() > cap) {
@@ -242,8 +241,7 @@ void snap_round(GradedFillState& s) {
     for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
         fill_progress_poll(ti, out.mesh.tets.size());
         const auto& n = out.mesh.tets[ti];
-        if (on_boundary[n[0]] || on_boundary[n[1]] || on_boundary[n[2]] ||
-            on_boundary[n[3]]) {
+        if (on_boundary[n[0]] || on_boundary[n[1]] || on_boundary[n[2]] || on_boundary[n[3]]) {
             skin_tets.push_back(ti);
         }
     }
@@ -275,7 +273,8 @@ void snap_round(GradedFillState& s) {
     std::vector<std::uint32_t> stragglers;
     if (projection != nullptr) {
         for (std::size_t work_done = 0; const auto ni : snap_nodes) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, snap_nodes.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, snap_nodes.size());
             if (ni >= out.mesh.nodes.size()) {
                 continue;
             }
@@ -297,7 +296,8 @@ void snap_round(GradedFillState& s) {
         mesh::sort_mirror_canonical(out.mesh.nodes, stragglers);
         std::vector<char> rescued(out.mesh.nodes.size(), 0);
         for (std::size_t work_done = 0; const auto seed : stragglers) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, stragglers.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, stragglers.size());
             if (rescued[seed] != 0) {
                 continue;
             }
@@ -315,8 +315,8 @@ void snap_round(GradedFillState& s) {
             bool have_all = true;
             for (const auto node : group) {
                 fill_progress_poll();
-                const auto target = boundary_projection_target(
-                    surface, out.mesh.nodes[node], node, projection, mirror);
+                const auto target = boundary_projection_target(surface, out.mesh.nodes[node],
+                                                               node, projection, mirror);
                 if (!target) {
                     have_all = false;
                     break;
@@ -432,7 +432,8 @@ void snap_round(GradedFillState& s) {
     {
         const double thr = 0.08 * hc;
         for (std::size_t work_done = 0; auto ni : snap_nodes) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, snap_nodes.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, snap_nodes.size());
             if (ni >= out.mesh.nodes.size()) {
                 continue;
             }

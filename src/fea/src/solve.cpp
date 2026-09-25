@@ -69,12 +69,11 @@ SolveDecision decide_solve_method(Eigen::Index nfree, const SolveOptions& option
         estimate.direct_peak_bytes > effective_cap_bytes &&
         estimate.cg_peak_bytes <= effective_cap_bytes) {
         decision.method = SolveMethod::kCG;
-        decision.note =
-            std::format("memory budget: direct-factor estimate {} exceeds cap {}; "
-                        "using CG estimate {}",
-                        format_memory_bytes(estimate.direct_peak_bytes),
-                        format_memory_bytes(effective_cap_bytes),
-                        format_memory_bytes(estimate.cg_peak_bytes));
+        decision.note = std::format("memory budget: direct-factor estimate {} exceeds cap {}; "
+                                    "using CG estimate {}",
+                                    format_memory_bytes(estimate.direct_peak_bytes),
+                                    format_memory_bytes(effective_cap_bytes),
+                                    format_memory_bytes(estimate.cg_peak_bytes));
     }
     decision.estimated_bytes = decision.method == SolveMethod::kDirect
                                    ? estimate.direct_peak_bytes
@@ -150,7 +149,6 @@ using SolveClock = std::chrono::steady_clock;
 double elapsed_ms(SolveClock::time_point since) {
     return std::chrono::duration<double, std::milli>(SolveClock::now() - since).count();
 }
-
 
 std::string_view cg_stop_text(CgStop stop) {
     switch (stop) {
@@ -406,19 +404,16 @@ ReducedSolveResult solve_reduced_cg(const Eigen::SparseMatrix<double>& kff,
     Eigen::IncompleteCholesky<double> ichol;
     ichol.compute(a);
     if (ichol.info() == Eigen::Success) {
-        const std::string name =
-            std::format("{}incomplete Cholesky (shift={})", eq,
-                        ichol_shift_text(ichol, kIcDefaultInitialShift));
+        const std::string name = std::format("{}incomplete Cholesky (shift={})", eq,
+                                             ichol_shift_text(ichol, kIcDefaultInitialShift));
         run_attempt(name, ichol);
     } else {
         const std::string failed_shift = ichol_shift_text(ichol, kIcDefaultInitialShift);
-        attempts.push_back(
-            std::format("{}incomplete Cholesky: factorization failed after shift {}", eq,
-                        failed_shift));
-        emit_note(
-            std::format("CG incomplete Cholesky factorization failed after shift {}; "
-                        "retrying with initial shift {}",
-                        failed_shift, kIcRetryInitialShift));
+        attempts.push_back(std::format(
+            "{}incomplete Cholesky: factorization failed after shift {}", eq, failed_shift));
+        emit_note(std::format("CG incomplete Cholesky factorization failed after shift {}; "
+                              "retrying with initial shift {}",
+                              failed_shift, kIcRetryInitialShift));
 
         ichol.setInitialShift(kIcRetryInitialShift);
         ichol.factorize(a); // reuse the already-computed AMD ordering
@@ -448,8 +443,8 @@ ReducedSolveResult solve_reduced_cg(const Eigen::SparseMatrix<double>& kff,
     }
 
     const std::string provenance = join_attempts(attempts);
-    if (!target_met && (!have_attempt ||
-                        selected_attempt.true_relative_residual > options.cg_accept_tol)) {
+    if (!target_met &&
+        (!have_attempt || selected_attempt.true_relative_residual > options.cg_accept_tol)) {
         throw FeaError(std::format(
             "solve_elastostatics: CG failed (target tol={}, acceptance tol={}, "
             "max iterations per attempt={}, total iterations={}, best preconditioner={}, "
@@ -465,8 +460,8 @@ ReducedSolveResult solve_reduced_cg(const Eigen::SparseMatrix<double>& kff,
         emit_note(
             std::format("CG converged with {} after {} iterations ({} total; "
                         "true relative residual={}; reliable restarts={}); attempts=[{}]",
-                        selected_preconditioner, selected_attempt.iterations,
-                        total_iterations, selected_attempt.true_relative_residual,
+                        selected_preconditioner, selected_attempt.iterations, total_iterations,
+                        selected_attempt.true_relative_residual,
                         selected_attempt.reliable_restarts, provenance));
     } else {
         emit_note(std::format(
@@ -478,9 +473,8 @@ ReducedSolveResult solve_reduced_cg(const Eigen::SparseMatrix<double>& kff,
             selected_attempt.reliable_restarts, provenance));
     }
     SolveCostMeasured measured;
-    measured.method = selected_preconditioner.find("Jacobi") != std::string::npos
-                          ? "cg-jacobi"
-                          : "cg-ichol";
+    measured.method =
+        selected_preconditioner.find("Jacobi") != std::string::npos ? "cg-jacobi" : "cg-ichol";
     measured.cg_iterations = selected_attempt.iterations;
     measured.cg_restarts = selected_attempt.reliable_restarts;
     measured.factor_nnz = symbolic_cost.factor_nnz;
@@ -488,9 +482,7 @@ ReducedSolveResult solve_reduced_cg(const Eigen::SparseMatrix<double>& kff,
         static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_flops_per_iter;
     measured.bytes =
         static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_bytes_per_iter;
-    return {.u = std::move(selected_attempt.x),
-            .cost = std::move(measured),
-            .phases = phases};
+    return {.u = std::move(selected_attempt.x), .cost = std::move(measured), .phases = phases};
 }
 
 /// Direct ladder for SPD K_ff (rigid-body modes removed): CholmodSupernodalLLT
@@ -501,7 +493,8 @@ ReducedSolveResult solve_reduced_cg(const Eigen::SparseMatrix<double>& kff,
 /// nested CHOLMOD/BLAS pools oversubscribe SMT hosts; the caller's limit is
 /// restored on exit. Measurements: docs/solver-core.md §6.1 and §6.1a.
 ReducedSolveResult solve_reduced_direct(const Eigen::SparseMatrix<double>& kff,
-                                        const Eigen::VectorXd& rhs, const SolveOptions& options,
+                                        const Eigen::VectorXd& rhs,
+                                        const SolveOptions& options,
                                         const SolveCostEstimate& symbolic_cost) {
     SolvePhaseTimings phases;
     constexpr int kMaxFactorizationThreads = 8;
@@ -559,8 +552,7 @@ ReducedSolveResult solve_reduced_direct(const Eigen::SparseMatrix<double>& kff,
         // SparseLU initializes its status only in factorize(), unlike the
         // Cholesky solvers. Querying it after analysis asserts in Eigen.
         using Solver = std::remove_cvref_t<decltype(solver)>;
-        if constexpr (!std::is_same_v<Solver,
-                                     Eigen::SparseLU<Eigen::SparseMatrix<double>>>) {
+        if constexpr (!std::is_same_v<Solver, Eigen::SparseLU<Eigen::SparseMatrix<double>>>) {
             if (solver.info() != Eigen::Success) {
                 return false;
             }
@@ -621,8 +613,8 @@ ReducedSolveResult solve_reduced_direct(const Eigen::SparseMatrix<double>& kff,
                                      [&](const Rung& r) { return matches(r.label); });
         if (it != ladder.end()) {
             std::rotate(ladder.begin(), it, it + 1);
-            emit_note(std::format("direct solve: POLYMESH_FEA_DIRECT={} leads the ladder",
-                                  want));
+            emit_note(
+                std::format("direct solve: POLYMESH_FEA_DIRECT={} leads the ladder", want));
         }
     }
     for (const auto& rung : ladder) {
@@ -630,10 +622,10 @@ ReducedSolveResult solve_reduced_direct(const Eigen::SparseMatrix<double>& kff,
     }
 
     if (factorization.empty()) {
-        throw FeaError(std::format(
-            "solve_elastostatics: factorization failed — system is singular "
-            "(insufficient constraints?); rungs tried: [{}]",
-            join_attempts(rungs)));
+        throw FeaError(
+            std::format("solve_elastostatics: factorization failed — system is singular "
+                        "(insufficient constraints?); rungs tried: [{}]",
+                        join_attempts(rungs)));
     }
     if (!rungs.empty()) {
         emit_note(std::format("direct solve: {} produced the answer after [{}]", factorization,
@@ -664,10 +656,9 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
 } // namespace
 
 LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& material,
-                                      const Dirichlet& dirichlet,
-                                      const Eigen::VectorXd& loads,
+                                      const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
                                       const SolveOptions& options,
-                                    const LinearConstraints* constraints) {
+                                      const LinearConstraints* constraints) {
     const auto call_start = SolveClock::now();
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
@@ -719,21 +710,19 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
     if (symbolic_cost.nfree != nfree) {
         throw FeaError("solve_elastostatics: symbolic free-DOF count mismatch");
     }
-    const auto estimate =
-        estimate_solve_resources(mesh, nfree, symbolic_cost.factor_nnz);
+    const auto estimate = estimate_solve_resources(mesh, nfree, symbolic_cost.factor_nnz);
     const auto budget = effective_memory_budget(options.max_mem_gb);
     const auto decision =
         decide_solve_method(nfree, options, estimate, budget.effective_cap_bytes);
     if (decision.estimated_bytes > budget.effective_cap_bytes) {
         const bool direct = decision.method == SolveMethod::kDirect;
-        throw FeaError(
-            std::format("solve_elastostatics: estimated {} solve footprint {} exceeds "
-                        "effective memory cap "
-                        "{} (limiting term: {}); raise --max-mem <GB> or free system memory",
-                        direct ? "direct" : "CG",
-                        format_memory_bytes(decision.estimated_bytes),
-                        format_memory_bytes(budget.effective_cap_bytes),
-                        limiting_resource_term(estimate, direct)));
+        throw FeaError(std::format(
+            "solve_elastostatics: estimated {} solve footprint {} exceeds "
+            "effective memory cap "
+            "{} (limiting term: {}); raise --max-mem <GB> or free system memory",
+            direct ? "direct" : "CG", format_memory_bytes(decision.estimated_bytes),
+            format_memory_bytes(budget.effective_cap_bytes),
+            limiting_resource_term(estimate, direct)));
     }
     if (options.on_note) {
         if (!decision.note.empty()) {
@@ -867,8 +856,8 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
         const auto r = reduced[static_cast<std::size_t>(dof)];
         u_system[dof] = r >= 0 ? reduced_solve.u[r] : system_dirichlet.at(dof);
     }
-    Eigen::VectorXd u = has_linear_constraints ? constraints->recover(u_system, ndof)
-                                               : std::move(u_system);
+    Eigen::VectorXd u =
+        has_linear_constraints ? constraints->recover(u_system, ndof) : std::move(u_system);
 
     SolvePhaseTimings phases = reduced_solve.phases;
     phases.preflight_ms = preflight_ms;

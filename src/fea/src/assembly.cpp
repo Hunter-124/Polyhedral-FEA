@@ -192,10 +192,10 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
     Eigen::SparseMatrix<double> global(ndof, ndof);
     const auto nnz = 9 * adj.offsets.back();
     if (nnz > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
-        throw FeaError(std::format(
-            "assemble_stiffness: {} stiffness nonzeros exceed the {} that Eigen's "
-            "int sparse index can address; coarsen the mesh",
-            nnz, std::numeric_limits<int>::max()));
+        throw FeaError(
+            std::format("assemble_stiffness: {} stiffness nonzeros exceed the {} that Eigen's "
+                        "int sparse index can address; coarsen the mesh",
+                        nnz, std::numeric_limits<int>::max()));
     }
     global.resizeNonZeros(static_cast<Eigen::Index>(nnz));
     int* const outer = global.outerIndexPtr();
@@ -212,7 +212,8 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
         const auto first = adj.offsets[nu];
         const auto count = adj.offsets[nu + 1] - first;
         for (int axis = 0; axis < 3; ++axis) {
-            const auto column = 3 * static_cast<std::size_t>(nu) + static_cast<std::size_t>(axis);
+            const auto column =
+                3 * static_cast<std::size_t>(nu) + static_cast<std::size_t>(axis);
             auto at = 9 * first + 3 * count * static_cast<std::uint64_t>(axis);
             outer[column] = static_cast<int>(at);
             for (std::uint64_t k = 0; k < count; ++k) {
@@ -233,9 +234,8 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
         const auto first = adj.offsets[col_node];
         const auto last = adj.offsets[col_node + 1];
         const auto begin = adj.neighbours.begin() + static_cast<std::ptrdiff_t>(first);
-        const auto found =
-            std::lower_bound(begin, adj.neighbours.begin() + static_cast<std::ptrdiff_t>(last),
-                             row_node);
+        const auto found = std::lower_bound(
+            begin, adj.neighbours.begin() + static_cast<std::ptrdiff_t>(last), row_node);
         return 9 * first + 3 * static_cast<std::uint64_t>(std::distance(begin, found));
     };
 
@@ -264,9 +264,8 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
             const auto slot = static_cast<std::size_t>(e - begin);
             failures[slot].clear();
             try {
-                scratch[slot] =
-                    element_stiffness(mesh, mesh.elements[static_cast<std::size_t>(e)],
-                                      material);
+                scratch[slot] = element_stiffness(
+                    mesh, mesh.elements[static_cast<std::size_t>(e)], material);
             } catch (const std::exception& ex) {
                 failures[slot] = ex.what();
             }
@@ -284,16 +283,18 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
             for (std::size_t a = 0; a < n; ++a) {
                 for (std::size_t b = 0; b < n; ++b) {
                     const auto base = block_at(element.nodes[a], element.nodes[b]);
-                    const auto stride =
-                        3 * (adj.offsets[element.nodes[b] + 1] - adj.offsets[element.nodes[b]]);
+                    const auto stride = 3 * (adj.offsets[element.nodes[b] + 1] -
+                                             adj.offsets[element.nodes[b]]);
                     for (int i = 0; i < 3; ++i) {
                         for (int j = 0; j < 3; ++j) {
                             // Column 3*node_b+j starts `stride` entries after
                             // column 3*node_b+j-1 within the same node block.
                             values[base + static_cast<std::uint64_t>(j) * stride +
                                    static_cast<std::uint64_t>(i)] +=
-                                k(static_cast<Eigen::Index>(3 * a + static_cast<std::size_t>(i)),
-                                  static_cast<Eigen::Index>(3 * b + static_cast<std::size_t>(j)));
+                                k(static_cast<Eigen::Index>(3 * a +
+                                                            static_cast<std::size_t>(i)),
+                                  static_cast<Eigen::Index>(3 * b +
+                                                            static_cast<std::size_t>(j)));
                         }
                     }
                 }

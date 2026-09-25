@@ -182,10 +182,9 @@ CinemaHistogram inspect_histogram(const std::vector<double>& values) {
         return out;
     }
     out.mean = sum / static_cast<double>(out.samples);
-    const std::size_t p99_index = static_cast<std::size_t>(
-        std::floor(0.99 * static_cast<double>(finite.size() - 1)));
-    std::nth_element(finite.begin(),
-                     finite.begin() + static_cast<std::ptrdiff_t>(p99_index),
+    const std::size_t p99_index =
+        static_cast<std::size_t>(std::floor(0.99 * static_cast<double>(finite.size() - 1)));
+    std::nth_element(finite.begin(), finite.begin() + static_cast<std::ptrdiff_t>(p99_index),
                      finite.end());
     out.p99 = finite[p99_index];
     // A single constrained-node singularity must not flatten 99% of the
@@ -196,9 +195,8 @@ CinemaHistogram inspect_histogram(const std::vector<double>& values) {
         std::size_t bin = 0;
         if (display_span > 0.0) {
             const double u = std::clamp((value - out.min) / display_span, 0.0, 1.0);
-            bin = std::min(
-                static_cast<std::size_t>(u * static_cast<double>(out.bins.size())),
-                out.bins.size() - 1);
+            bin = std::min(static_cast<std::size_t>(u * static_cast<double>(out.bins.size())),
+                           out.bins.size() - 1);
         }
         ++out.bins[bin];
         out.tallest_bin = std::max(out.tallest_bin, out.bins[bin]);
@@ -303,8 +301,8 @@ void CinemaState::adopt_final_result(const pipeline::SolveResult& result) {
         std::vector<double> eta = result.element_eta;
         std::sort(eta.begin(), eta.end());
         const auto at = [&](double q) {
-            const std::size_t index = static_cast<std::size_t>(
-                std::floor(q * static_cast<double>(eta.size() - 1)));
+            const std::size_t index =
+                static_cast<std::size_t>(std::floor(q * static_cast<double>(eta.size() - 1)));
             return eta[index];
         };
         stage.trace.eta_p50 = at(0.50);
@@ -335,7 +333,8 @@ void CinemaState::adopt_final_result(const pipeline::SolveResult& result) {
             marker.result_node = std::numeric_limits<std::size_t>::max();
             double best = std::numeric_limits<double>::infinity();
             for (std::size_t i = 0; i < result.volume_mesh.nodes.size(); ++i) {
-                const double d2 = (result.volume_mesh.nodes[i] - marker.position).squaredNorm();
+                const double d2 =
+                    (result.volume_mesh.nodes[i] - marker.position).squaredNorm();
                 if (d2 < best) {
                     best = d2;
                     marker.result_node = i;
@@ -500,15 +499,14 @@ CinemaCue cinema_cue(const CinemaState& state) {
     if (cue.act == CinemaAct::kSkeleton) {
         const double wait = 0.08 * cue.act_span;
         const double slide = 0.14 * cue.act_span;
-        cue.panel_open = static_cast<float>(
-            smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
+        cue.panel_open =
+            static_cast<float>(smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
         const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
         cue.spectral_edge_reveal = smoothstep((p - 0.08) / 0.20);
         cue.spectral_spectrum_reveal = smoothstep((p - 0.24) / 0.22);
         cue.spectral_filter_mix = smoothstep((p - 0.42) / 0.25);
         cue.spectral_field_reveal = smoothstep((p - 0.56) / 0.30);
-        cue.spectral_overlay_alpha =
-            static_cast<float>(smoothstep((p - 0.05) / 0.08));
+        cue.spectral_overlay_alpha = static_cast<float>(smoothstep((p - 0.05) / 0.08));
     } else if (cue.act == CinemaAct::kDeliberate) {
         cue.spectral_edge_reveal = 1.0;
         cue.spectral_spectrum_reveal = 1.0;
@@ -516,8 +514,7 @@ CinemaCue cinema_cue(const CinemaState& state) {
         cue.spectral_field_reveal = 1.0;
         const double bridge = std::min(1.3, 0.18 * cue.act_span);
         const double q = smoothstep(cue.act_t / std::max(bridge, 1.0e-9));
-        cue.spectral_overlay_alpha =
-            static_cast<float>(1.0 + q * (kSizingCarryAlpha - 1.0f));
+        cue.spectral_overlay_alpha = static_cast<float>(1.0 + q * (kSizingCarryAlpha - 1.0f));
     } else if (cue.act == CinemaAct::kBuild) {
         cue.spectral_edge_reveal = 1.0;
         cue.spectral_spectrum_reveal = 1.0;
@@ -525,8 +522,7 @@ CinemaCue cinema_cue(const CinemaState& state) {
         cue.spectral_field_reveal = 1.0;
         const double handoff = std::max(cinema_decision_lead(state), 0.18 * cue.act_span);
         cue.spectral_overlay_alpha = static_cast<float>(
-            kSizingCarryAlpha *
-            (1.0 - smoothstep(cue.act_t / std::max(handoff, 1.0e-9))));
+            kSizingCarryAlpha * (1.0 - smoothstep(cue.act_t / std::max(handoff, 1.0e-9))));
     } else if (cue.act == CinemaAct::kSolve) {
         // The completed cell microscope dissolves directly into the solver's
         // equation board. Replaying the network here would move backwards.
@@ -581,8 +577,8 @@ CinemaCue cinema_cue(const CinemaState& state) {
         cue.stage_beat_seconds = beat;
         if (cue.act == CinemaAct::kBuild) {
             const double x = cue.act_t - lead;
-            cue.action_bridge_alpha = static_cast<float>(
-                smoothstep(cue.act_t / std::max(0.45 * lead, 1.0e-9)));
+            cue.action_bridge_alpha =
+                static_cast<float>(smoothstep(cue.act_t / std::max(0.45 * lead, 1.0e-9)));
             if (x < 0.0) {
                 cue.activation_wave = smoothstep(cue.act_t / std::max(lead, 1.0e-9));
             } else {
@@ -595,15 +591,13 @@ CinemaCue cinema_cue(const CinemaState& state) {
                 // A later audit snapshot with identical topology carries the
                 // already-landed mesh at full reveal, so the cells do not
                 // vanish between `fill` and `ship`.
-                const bool same_topology =
-                    clamped > 0 &&
-                    state.stages[clamped - 1].mesh.nodes.size() ==
-                        state.stages[clamped].mesh.nodes.size() &&
-                    state.stages[clamped - 1].mesh.elements.size() ==
-                        state.stages[clamped].mesh.elements.size();
+                const bool same_topology = clamped > 0 &&
+                                           state.stages[clamped - 1].mesh.nodes.size() ==
+                                               state.stages[clamped].mesh.nodes.size() &&
+                                           state.stages[clamped - 1].mesh.elements.size() ==
+                                               state.stages[clamped].mesh.elements.size();
                 cue.mesh_action_reveal =
-                    same_topology ? 1.0
-                                  : smoothstep((cue.stage_reveal - 0.28) / 0.72);
+                    same_topology ? 1.0 : smoothstep((cue.stage_reveal - 0.28) / 0.72);
                 cue.mesh_source = CinemaMeshSource::kFillStage;
                 cue.mesh_source_index = cue.stage_index;
             }
@@ -739,11 +733,9 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         // The target-spacing annotation yields only when the chosen action starts
         // producing actual cells in those same locations.
         view.skeleton_alpha = 0.45f;
-        view.reveal =
-            cue.stage_index >= 0 ? static_cast<float>(cue.mesh_action_reveal) : 0.0f;
+        view.reveal = cue.stage_index >= 0 ? static_cast<float>(cue.mesh_action_reveal) : 0.0f;
         view.mesh_alpha = 1.0f;
-        view.shrink =
-            cue.stage_index >= 0 ? shrink_for(cue.mesh_action_reveal) : 1.0f;
+        view.shrink = cue.stage_index >= 0 ? shrink_for(cue.mesh_action_reveal) : 1.0f;
         view.spectral_edge_reveal = static_cast<float>(cue.spectral_edge_reveal);
         view.spectral_field_reveal = static_cast<float>(cue.spectral_field_reveal);
         view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
@@ -775,8 +767,7 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
             // exact topology diff over it. Once the field has dissolved, the
             // existing structural transition continues without a reset.
             const double p = std::clamp(cue.refine_reveal, 0.0, 1.0);
-            const float handoff =
-                static_cast<float>(smoothstep(p / kFieldToMeshHandoff));
+            const float handoff = static_cast<float>(smoothstep(p / kFieldToMeshHandoff));
             const double added = smoothstep((p - 0.40) / 0.60);
             view.skeleton_alpha = 0.35f * handoff;
             view.reveal = static_cast<float>(added);
@@ -796,8 +787,8 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         } else if (cue.solve_phase == SolvePhase::kStressSweep) {
             // The finished mesh carries into analysis and fades only as stress
             // colours arrive, avoiding a mesh→grey reset at the act/pass edge.
-            const float mesh_carry = static_cast<float>(
-                1.0 - smoothstep(cue.field_front / kMeshToFieldHandoff));
+            const float mesh_carry =
+                static_cast<float>(1.0 - smoothstep(cue.field_front / kMeshToFieldHandoff));
             view.skeleton_alpha = 0.25f * mesh_carry;
             view.reveal = 1.0f;
             view.mesh_alpha = mesh_carry;
@@ -826,13 +817,11 @@ CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
     const auto index = static_cast<std::size_t>(cue.solve_stage_index);
     const pipeline::SolveResult& result = state.solve_stages[index].result;
     const double stress_display_max =
-        index < state.stress_histograms.size() &&
-                state.stress_histograms[index].p99 > 0.0
+        index < state.stress_histograms.size() && state.stress_histograms[index].p99 > 0.0
             ? state.stress_histograms[index].p99
             : result.max_von_mises;
     const double error_display_max =
-        index < state.error_histograms.size() &&
-                state.error_histograms[index].p99 > 0.0
+        index < state.error_histograms.size() && state.error_histograms[index].p99 > 0.0
             ? state.error_histograms[index].p99
             : result.max_nodal_eta;
     const auto gradient_display_max = [&]() {
@@ -876,8 +865,7 @@ CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
             out.mode = DisplayMode::kResultsGradient;
             out.result_max = static_cast<float>(gradient_display_max());
         }
-        arm_sweep(cue.solve_phase == SolvePhase::kGradientSweep,
-                  DisplayMode::kResultsVonMises,
+        arm_sweep(cue.solve_phase == SolvePhase::kGradientSweep, DisplayMode::kResultsVonMises,
                   static_cast<float>(stress_display_max));
         break;
     }
@@ -890,11 +878,10 @@ CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
         const double gmax = state.gradient_max(index);
         const bool carry_gradient =
             index == 0 && !state.gradient_field(index).empty() && gmax > 0.0;
-        arm_sweep(cue.solve_phase == SolvePhase::kError,
-                  carry_gradient ? DisplayMode::kResultsGradient
-                                 : DisplayMode::kResultsVonMises,
-                  static_cast<float>(carry_gradient ? gradient_display_max()
-                                                    : stress_display_max));
+        arm_sweep(
+            cue.solve_phase == SolvePhase::kError,
+            carry_gradient ? DisplayMode::kResultsGradient : DisplayMode::kResultsVonMises,
+            static_cast<float>(carry_gradient ? gradient_display_max() : stress_display_max));
         break;
     }
     case SolvePhase::kRefine:
@@ -916,10 +903,8 @@ CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
         // cap by λ makes the drawn colour λ·s / p99 while the true peak remains
         // stated numerically in the pane and strip.
         out.result_max =
-            static_cast<float>(stress_display_max /
-                               std::max(lambda, kMinLoadFactor));
-        arm_sweep(cue.solve_phase == SolvePhase::kLoadRamp,
-                  DisplayMode::kResultsError,
+            static_cast<float>(stress_display_max / std::max(lambda, kMinLoadFactor));
+        arm_sweep(cue.solve_phase == SolvePhase::kLoadRamp, DisplayMode::kResultsError,
                   static_cast<float>(error_display_max));
         break;
     }
@@ -975,9 +960,8 @@ void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, const Cinema
         // input supplied no spectral story. A failed extractor must never leave
         // the last part's spacing rings hovering over the new skeleton.
         viewport.set_cinema_sizing_samples(
-            state.sizing.field_points, state.sizing.field_h_before,
-            state.sizing.field_h_after, state.sizing.edge_points,
-            state.sizing.edge_h_before, state.sizing.edge_h_after);
+            state.sizing.field_points, state.sizing.field_h_before, state.sizing.field_h_after,
+            state.sizing.edge_points, state.sizing.edge_h_before, state.sizing.edge_h_after);
         state.uploaded_sizing_story = true;
     }
     // Per-element buffer: re-uploaded only when the cue names a different mesh,

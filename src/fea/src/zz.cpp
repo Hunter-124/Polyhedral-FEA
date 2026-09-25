@@ -136,7 +136,8 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     }
     std::vector<std::uint32_t> incident_elements(incident_offsets.back());
     {
-        std::vector<std::uint32_t> cursor(incident_offsets.begin(), incident_offsets.end() - 1);
+        std::vector<std::uint32_t> cursor(incident_offsets.begin(),
+                                          incident_offsets.end() - 1);
         for (std::size_t e = 0; e < n_elem; ++e) {
             for (const auto node : mesh.elements[e].nodes) {
                 incident_elements[cursor[node]++] = static_cast<std::uint32_t>(e);

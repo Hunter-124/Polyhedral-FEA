@@ -24,8 +24,8 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 
 namespace polymesh::gui {
 namespace {
@@ -651,8 +651,7 @@ void Camera::fit_oriented(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d
     const Eigen::Vector3f s = f.cross(Eigen::Vector3f(0, 0, 1)).normalized();
     const Eigen::Vector3f u = s.cross(f);
     const float safe_aspect = std::max(aspect, 1.0e-6f);
-    const float tan_y =
-        std::clamp(fill, 0.05f, 1.0f) * std::tan(0.5f * fov_y_);
+    const float tan_y = std::clamp(fill, 0.05f, 1.0f) * std::tan(0.5f * fov_y_);
     const float tan_x = tan_y * safe_aspect;
     float required = 0.0f;
     // Solve the perspective inequalities on the eight AABB corners themselves:
@@ -667,10 +666,9 @@ void Camera::fit_oriented(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d
                                         static_cast<float>(iy) * half.y(),
                                         static_cast<float>(iz) * half.z());
                 const float depth_offset = f.dot(d);
-                required = std::max(
-                    {required, std::fabs(s.dot(d)) / tan_x - depth_offset,
-                     std::fabs(u.dot(d)) / tan_y - depth_offset,
-                     -depth_offset + 1.0e-3f * std::max(half.norm(), 1.0f)});
+                required = std::max({required, std::fabs(s.dot(d)) / tan_x - depth_offset,
+                                     std::fabs(u.dot(d)) / tan_y - depth_offset,
+                                     -depth_offset + 1.0e-3f * std::max(half.norm(), 1.0f)});
             }
         }
     }
@@ -1091,13 +1089,12 @@ void Viewport::set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& pol
                  skeleton_data_.data(), GL_DYNAMIC_DRAW);
 }
 
-void Viewport::set_cinema_sizing_samples(
-    const std::vector<Eigen::Vector3d>& field_points,
-    const std::vector<double>& field_h_before,
-    const std::vector<double>& field_h_after,
-    const std::vector<Eigen::Vector3d>& edge_points,
-    const std::vector<double>& edge_h_before,
-    const std::vector<double>& edge_h_after) {
+void Viewport::set_cinema_sizing_samples(const std::vector<Eigen::Vector3d>& field_points,
+                                         const std::vector<double>& field_h_before,
+                                         const std::vector<double>& field_h_after,
+                                         const std::vector<Eigen::Vector3d>& edge_points,
+                                         const std::vector<double>& edge_h_before,
+                                         const std::vector<double>& edge_h_after) {
     sizing_vertex_count_ = 0;
     const bool field_ok = field_points.size() == field_h_before.size() &&
                           field_points.size() == field_h_after.size();
@@ -1157,12 +1154,11 @@ void Viewport::set_cinema_sizing_samples(
 
     std::vector<float> data;
     data.reserve((field_points.size() + edge_points.size()) * 7);
-    const auto append = [&](const Eigen::Vector3d& p, double before, double after,
-                            float order, float kind) {
-        data.insert(data.end(),
-                    {static_cast<float>(p.x()), static_cast<float>(p.y()),
-                     static_cast<float>(p.z()), normalise_h(before),
-                     normalise_h(after), order, kind});
+    const auto append = [&](const Eigen::Vector3d& p, double before, double after, float order,
+                            float kind) {
+        data.insert(data.end(), {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                                 static_cast<float>(p.z()), normalise_h(before),
+                                 normalise_h(after), order, kind});
     };
     for (std::size_t i = 0; i < field_points.size(); ++i) {
         const float order = static_cast<float>(
@@ -1185,7 +1181,8 @@ void Viewport::set_cinema_sizing_samples(
 void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
     std::vector<CinemaCellRef> cells;
     cells.reserve(mesh.elements.size());
-    const double denom = mesh.elements.empty() ? 1.0 : static_cast<double>(mesh.elements.size());
+    const double denom =
+        mesh.elements.empty() ? 1.0 : static_cast<double>(mesh.elements.size());
     for (std::size_t i = 0; i < mesh.elements.size(); ++i) {
         cells.push_back({&mesh, i, 0.0f, static_cast<float>(static_cast<double>(i) / denom)});
     }
@@ -1252,8 +1249,8 @@ void Viewport::set_cinema_mesh_transition(const fea::NodalMesh& previous,
     }
 
     std::vector<std::size_t> removed;
-    removed.reserve(previous.elements.size() - std::min(previous.elements.size(),
-                                                        unchanged.size()));
+    removed.reserve(previous.elements.size() -
+                    std::min(previous.elements.size(), unchanged.size()));
     for (std::size_t i = 0; i < old_matched.size(); ++i) {
         if (!old_matched[i]) {
             removed.push_back(i);
@@ -1420,7 +1417,6 @@ std::size_t Viewport::cinema_added_element_count() const {
     return cinema_added_element_count_;
 }
 
-
 void Viewport::set_cinema_view(const CinemaView& view) { cinema_view_ = view; }
 
 void Viewport::set_result(const SolveResult& result, const std::vector<double>* nodal_extra) {
@@ -1501,9 +1497,8 @@ void Viewport::set_cinema_motion_bounds(const SolveResult& result, float deform_
         cinema_motion_bounds_.add(nodes[i]);
         if (has_displacement) {
             const Eigen::Index base = 3 * static_cast<Eigen::Index>(i);
-            const Eigen::Vector3d moved =
-                nodes[i] + static_cast<double>(deform_scale) *
-                               result.displacement.segment<3>(base);
+            const Eigen::Vector3d moved = nodes[i] + static_cast<double>(deform_scale) *
+                                                         result.displacement.segment<3>(base);
             cinema_motion_bounds_.add(moved);
         }
     }
@@ -1660,7 +1655,8 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         if (sweep_on) {
             std::array<float, 3> carry = kUnsweptGrey;
             if (carry_scalars != nullptr) {
-                const double prior = node < carry_scalars->size() ? (*carry_scalars)[node] : 0.0;
+                const double prior =
+                    node < carry_scalars->size() ? (*carry_scalars)[node] : 0.0;
                 carry = fea_colormap(static_cast<float>(prior) / carry_denom);
             }
             // Rest position, not the deformed one: the reveal is a fixed plane
@@ -1668,8 +1664,7 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
             // make the front wobble as the load ramps.
             const float x = static_cast<float>(
                 (sweep_dir.dot(result_rest_[node]) - sweep_u_min) / sweep_span);
-            rgb = sweep_sample_color(rgb, carry, x, field_sweep_.front,
-                                     field_sweep_.feather);
+            rgb = sweep_sample_color(rgb, carry, x, field_sweep_.front, field_sweep_.feather);
         }
         data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
     };
@@ -1878,8 +1873,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
     const float reveal = std::clamp(cinema_view_.reveal, 0.0f, 1.0f);
     const float shrink = std::clamp(cinema_view_.shrink, 0.0f, 1.0f);
     const float mesh_alpha = std::clamp(cinema_view_.mesh_alpha, 0.0f, 1.0f);
-    const bool incremental =
-        cinema_view_.incremental_transition && cinema_transition_active_;
+    const bool incremental = cinema_view_.incremental_transition && cinema_transition_active_;
     const float transition = std::clamp(cinema_view_.transition_progress, 0.0f, 1.0f);
 
     glEnable(GL_BLEND);
@@ -1922,8 +1916,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
         glLineWidth(1.0f);
     }
 
-    const float sizing_alpha =
-        std::clamp(cinema_view_.spectral_overlay_alpha, 0.0f, 1.0f);
+    const float sizing_alpha = std::clamp(cinema_view_.spectral_overlay_alpha, 0.0f, 1.0f);
     if (sizing_vertex_count_ > 0 && sizing_alpha > 0.0f) {
         glUseProgram(sizing_program_);
         glUniformMatrix4fv(glGetUniformLocation(sizing_program_, "u_view"), 1, GL_FALSE,
@@ -1949,8 +1942,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
 
     // An incremental transition still draws persistent/removed cells when the
     // added-cell reveal is zero.
-    if (cinema_vertex_count_ > 0 && (reveal > 0.0f || incremental) &&
-        mesh_alpha > 0.0f) {
+    if (cinema_vertex_count_ > 0 && (reveal > 0.0f || incremental) && mesh_alpha > 0.0f) {
         const bool draw_edges = cinema_view_.edges && cinema_edge_vertex_count_ > 0 &&
                                 cinema_view_.edge_alpha > 0.0f;
         if (draw_edges) {

@@ -243,9 +243,7 @@ TEST_CASE("the p-elevated authoritative solve reports its own solver provenance"
 
     std::vector<SolveStage> stages;
     SolveJob job;
-    job.on_solve_stage = [&stages](const SolveStage& stage) {
-        stages.push_back(stage);
-    };
+    job.on_solve_stage = [&stages](const SolveStage& stage) { stages.push_back(stage); };
     job.start(model, setup);
     std::optional<SolveResult> promoted;
     for (int i = 0; i < 800; ++i) {

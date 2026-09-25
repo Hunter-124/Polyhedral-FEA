@@ -238,14 +238,12 @@ MixedConversion convert_mixed_cells(std::vector<Eigen::Vector3d> nodes,
 
 // The public `volume_mesh` below wraps this: a refinement-limit hit becomes an
 // auto-h retry and a zero-interior-cell fill a resolution refusal.
-static VolumeMeshOutput
-volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_layers,
-                 bool feature_refine, std::span<const Eigen::Vector3d> refine_seeds,
-                 double seed_band, double element_tendency, std::size_t max_elems,
-                 std::size_t max_dof, int auto_retry_budget,
-                 const std::function<void()>& cancel_check,
-                 const mesh::SizeFieldFn& size_field, const MeshStageSink& on_stage,
-                 const mesh::FillOptions& fill_options) {
+static VolumeMeshOutput volume_mesh_impl(
+    const Model& model, double h, VolumeMesher mesher, int skin_layers, bool feature_refine,
+    std::span<const Eigen::Vector3d> refine_seeds, double seed_band, double element_tendency,
+    std::size_t max_elems, std::size_t max_dof, int auto_retry_budget,
+    const std::function<void()>& cancel_check, const mesh::SizeFieldFn& size_field,
+    const MeshStageSink& on_stage, const mesh::FillOptions& fill_options) {
     const auto poll_cancel = [&] {
         if (cancel_check) {
             cancel_check();
@@ -1119,12 +1117,13 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         // tessellated corner curvature is not a reason to halve the whole part.
         mesh::SizeFieldFn graded_field = size_field;
         if (cad_topology && !cad_topology->empty()) {
-            const auto geometry_field = feature_refine
-                ? build_refinement_plan(model, h, {}, true, false, 0).size_field
-                : mesh::SizeFieldFn{};
+            const auto geometry_field =
+                feature_refine ? build_refinement_plan(model, h, {}, true, false, 0).size_field
+                               : mesh::SizeFieldFn{};
             graded_field = [size_field, geometry_field, h](const Eigen::Vector3d& p) {
                 double target = geometry_field ? geometry_field(p) : h;
-                if (size_field) target = std::min(target, size_field(p));
+                if (size_field)
+                    target = std::min(target, size_field(p));
                 return target;
             };
         }
@@ -2231,11 +2230,10 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         // The retry is a second, independent fill, so it gets the sink too and
         // its stage indices restart at 0; the abandoned attempt's stages stay
         // reported.
-        auto retry =
-            volume_mesh(model, retry_h, requested_mesher, requested_skin_layers,
-                        feature_refine, refine_seeds, seed_band, element_tendency, max_elems,
-                        max_dof, auto_retry_budget - 1, cancel_check, size_field, on_stage,
-                        fill_options);
+        auto retry = volume_mesh(model, retry_h, requested_mesher, requested_skin_layers,
+                                 feature_refine, refine_seeds, seed_band, element_tendency,
+                                 max_elems, max_dof, auto_retry_budget - 1, cancel_check,
+                                 size_field, on_stage, fill_options);
         const std::string ceiling_note =
             elem_over ? std::format("element ceiling {}, actual {}", max_elems, actual_elems)
                       : std::format("DOF ceiling {}, actual {}", max_dof, actual_dof);
@@ -2314,15 +2312,13 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         GeometryVolumeAssessment{}, false);
 }
 
-VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
-                             int skin_layers, bool feature_refine,
-                             std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-                             double element_tendency, std::size_t max_elems,
-                             std::size_t max_dof, int auto_retry_budget,
-                             const std::function<void()>& cancel_check,
-                             const mesh::SizeFieldFn& size_field,
-                             const MeshStageSink& on_stage,
-                             const mesh::FillOptions& fill_options) {
+VolumeMeshOutput
+volume_mesh(const Model& model, double h, VolumeMesher mesher, int skin_layers,
+            bool feature_refine, std::span<const Eigen::Vector3d> refine_seeds,
+            double seed_band, double element_tendency, std::size_t max_elems,
+            std::size_t max_dof, int auto_retry_budget,
+            const std::function<void()>& cancel_check, const mesh::SizeFieldFn& size_field,
+            const MeshStageSink& on_stage, const mesh::FillOptions& fill_options) {
     try {
         return volume_mesh_impl(model, h, mesher, skin_layers, feature_refine, refine_seeds,
                                 seed_band, element_tendency, max_elems, max_dof,
@@ -2332,18 +2328,17 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         if (auto_retry_budget <= 0) {
             throw;
         }
-        const double scale = std::cbrt(static_cast<double>(e.elements) /
-                                       static_cast<double>(e.limit));
+        const double scale =
+            std::cbrt(static_cast<double>(e.elements) / static_cast<double>(e.limit));
         const double retry_h =
             std::nextafter(h * scale * 1.05, std::numeric_limits<double>::infinity());
-        auto retry = volume_mesh(model, retry_h, mesher, skin_layers, feature_refine,
-                                 refine_seeds, seed_band, element_tendency, max_elems,
-                                 max_dof, auto_retry_budget - 1, cancel_check, size_field,
-                                 on_stage, fill_options);
-        retry.mesher_note =
-            std::format("auto h clamped from {:.4g} to {:.4g} m "
-                        "(refinement ceiling {}, actual {}) | {}",
-                        h, retry_h, e.limit, e.elements, retry.mesher_note);
+        auto retry =
+            volume_mesh(model, retry_h, mesher, skin_layers, feature_refine, refine_seeds,
+                        seed_band, element_tendency, max_elems, max_dof, auto_retry_budget - 1,
+                        cancel_check, size_field, on_stage, fill_options);
+        retry.mesher_note = std::format("auto h clamped from {:.4g} to {:.4g} m "
+                                        "(refinement ceiling {}, actual {}) | {}",
+                                        h, retry_h, e.limit, e.elements, retry.mesher_note);
         return retry;
     } catch (const mesh::ValidityError& e) {
         // ONLY this cause is reclassified; every other validity failure

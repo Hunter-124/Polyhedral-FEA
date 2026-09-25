@@ -63,8 +63,8 @@ inline constexpr std::array<const char*, 12> kOutputNames{
 // width, narrower than `input_columns` by the two categorical columns and wider
 // by the two embedding blocks); `trunk_fc1` and `trunk_fc2` are the POST-GELU
 // hidden tensors.
-inline constexpr std::array<const char*, 3> kActivationOutputNames{"trunk_input",
-                                                                   "trunk_fc1", "trunk_fc2"};
+inline constexpr std::array<const char*, 3> kActivationOutputNames{"trunk_input", "trunk_fc1",
+                                                                   "trunk_fc2"};
 
 } // namespace detail
 

@@ -112,14 +112,15 @@ struct SolvePhaseLog {
 
     void report() const {
         const auto peak = polymesh::fea::peak_resident_bytes();
-        std::printf("phases: import=%.2f refine=%.2f mesh=%.2f bc=%.2f preflight=%.2f "
-                    "assemble=%.2f reduce=%.2f order=%.2f factor=%.2f backsolve=%.2f "
-                    "stress=%.2f export=%.2f s | solves=%d | total=%.2f s | peak RSS=%s | %s\n",
-                    import_s, refine_s, mesh_s, bc_s, preflight_s, assemble_s, reduce_s,
-                    order_s, factor_s, backsolve_s, stress_s, export_s, n_solves, since(start),
-                    peak > 0 ? polymesh::fea::format_memory_bytes(peak).c_str()
-                             : "not reported by this OS",
-                    polymesh::fea::performance_description().c_str());
+        std::printf(
+            "phases: import=%.2f refine=%.2f mesh=%.2f bc=%.2f preflight=%.2f "
+            "assemble=%.2f reduce=%.2f order=%.2f factor=%.2f backsolve=%.2f "
+            "stress=%.2f export=%.2f s | solves=%d | total=%.2f s | peak RSS=%s | %s\n",
+            import_s, refine_s, mesh_s, bc_s, preflight_s, assemble_s, reduce_s, order_s,
+            factor_s, backsolve_s, stress_s, export_s, n_solves, since(start),
+            peak > 0 ? polymesh::fea::format_memory_bytes(peak).c_str()
+                     : "not reported by this OS",
+            polymesh::fea::performance_description().c_str());
     }
 };
 
@@ -507,12 +508,10 @@ int cmd_solve(std::span<char*> args) {
                                      "is unavailable for .msh");
         }
         const auto mesh_start = SolvePhaseLog::Clock::now();
-        auto out = polymesh::pipeline::volume_mesh(*model, h_use, m, skin, feature, seeds,
-                                                   seed_band, element_tendency,
-                                                   resolved.element_ceiling,
-                                                   resolved.dof_ceiling,
-                                                   resolved.auto_chosen ? 3 : 0, {},
-                                                   size_field);
+        auto out = polymesh::pipeline::volume_mesh(
+            *model, h_use, m, skin, feature, seeds, seed_band, element_tendency,
+            resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
+            size_field);
         phase_log.mesh_s += SolvePhaseLog::since(mesh_start);
         return out;
     };
@@ -580,9 +579,9 @@ int cmd_solve(std::span<char*> args) {
                 "real face with --fix-box x0 y0 z0 x1 y1 z1.",
                 defect));
         }
-        auto loads = polymesh::fea::assemble_selection_load(v.mesh, load_faces, load_sel.nodes,
-                                                            load_spec, "solve", stdout,
-                                                            load_sel.region, exact_pressure_area);
+        auto loads = polymesh::fea::assemble_selection_load(
+            v.mesh, load_faces, load_sel.nodes, load_spec, "solve", stdout, load_sel.region,
+            exact_pressure_area);
         phase_log.bc_s += SolvePhaseLog::since(bc_start);
         return std::pair{std::move(bc), std::move(loads)};
     };
@@ -653,8 +652,8 @@ int cmd_solve(std::span<char*> args) {
     const auto run_solve = [&](const polymesh::fea::Dirichlet& bc,
                                const Eigen::VectorXd& loads,
                                const polymesh::fea::LinearConstraints* mpc) {
-        auto result = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads,
-                                                         solve_options, mpc);
+        auto result =
+            polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options, mpc);
         phase_log.add(result.phases);
         u = std::move(result.u);
         const auto stress_start = SolvePhaseLog::Clock::now();

@@ -47,7 +47,7 @@ struct FillOptions {
 /// Refinement stopped before another allocation-heavy wave. The measured
 /// count lets callers with an automatic size budget retry at a coarser h.
 class RefinementLimitError : public ValidityError {
-public:
+  public:
     RefinementLimitError(std::size_t actual, std::size_t ceiling)
         : ValidityError("graded_tet_fill_surface: memory-derived refinement ceiling exceeded"),
           elements(actual), limit(ceiling) {}

@@ -1369,8 +1369,8 @@ void enforce_feature_resolution(const Model& model, VolumeMeshOutput& output,
             output.mesher_note += std::format(
                 " | feature_absorbed face={} extent={:.6g} area={:.6g} "
                 "scale={:.6g} distance={:.6g}",
-                face_id, topology.faces[face_id].min_extent,
-                topology.faces[face_id].area, absorption_limit, face_distance[face_id]);
+                face_id, topology.faces[face_id].min_extent, topology.faces[face_id].area,
+                absorption_limit, face_distance[face_id]);
             continue;
         }
         unresolved = true;

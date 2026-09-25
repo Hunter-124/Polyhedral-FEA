@@ -94,9 +94,9 @@ void ProgressHeartbeat::tick_now() {
             const std::lock_guard lock(mu_);
             phase = phase_;
         }
-        const auto ms = std::chrono::duration<double, std::milli>(
-                            std::chrono::steady_clock::now() - t0_)
-                            .count();
+        const auto ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0_)
+                .count();
         const int cg = cg_iter_.load(std::memory_order_relaxed);
         write_progress(path_, phase, phase_frac_.load(std::memory_order_relaxed), ms, cfg_id_,
                        part_, tier_, cg, cg_resid_.load(std::memory_order_relaxed),

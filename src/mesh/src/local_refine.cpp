@@ -114,9 +114,8 @@ detail::EdgeKey longest_edge(const std::array<std::uint32_t, 4>& tet,
     EdgeCoords best_key = folded_edge(best);
     for (int i = 0; i < 4; ++i) {
         for (int j = i + 1; j < 4; ++j) {
-            const detail::EdgeKey e =
-                detail::sorted_edge_key(tet[static_cast<std::size_t>(i)],
-                                        tet[static_cast<std::size_t>(j)]);
+            const detail::EdgeKey e = detail::sorted_edge_key(
+                tet[static_cast<std::size_t>(i)], tet[static_cast<std::size_t>(j)]);
             const double len2 = (nodes[e.first] - nodes[e.second]).squaredNorm();
             // Relative slack: mirrored edges have equal lengths only to a few
             // ulp, and an absolute epsilon on squared lengths would rank one of
@@ -399,7 +398,8 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         // Prefer lowest remaining index among still-live tets.
         std::size_t seed = static_cast<std::size_t>(-1);
         for (std::size_t work_done = 0; const auto m : remaining) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, remaining.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, remaining.size());
             if (m < alive.size() && alive[m] &&
                 (seed == static_cast<std::size_t>(-1) || m < seed)) {
                 seed = m;
@@ -537,8 +537,8 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                                      ? max_sag_fraction * 0.5 * std::sqrt(parent_len2)
                                      : std::numeric_limits<double>::infinity();
         const bool was_projected = (projected - chord).squaredNorm() > 1e-30;
-        const bool sag_ok = !(max_sag_fraction > 0.0) ||
-                            (projected - chord).norm() <= sag_limit;
+        const bool sag_ok =
+            !(max_sag_fraction > 0.0) || (projected - chord).norm() <= sag_limit;
         bool can_split = sag_ok && projected_contracts && children_ok(projected);
         if (!can_split && was_projected) {
             can_split = children_ok(chord); // leaves nodes[mid]=chord when true
@@ -546,7 +546,8 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 ++local_stats.n_chord_mids;
                 // midpoint_of counted the projection when it made it; this edge
                 // is not keeping it, so the two counters stay a partition.
-                if (local_stats.n_surface_mids > 0) --local_stats.n_surface_mids;
+                if (local_stats.n_surface_mids > 0)
+                    --local_stats.n_surface_mids;
             }
         }
         if (!can_split) {

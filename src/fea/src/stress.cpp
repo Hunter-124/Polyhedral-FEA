@@ -76,8 +76,7 @@ void accumulate_nodal_stress(const NodalMesh& mesh, const NodalElement& element,
         const auto shape = eval_shape(element.type, ref[a]);
         const Eigen::Matrix3d jac = shape.dn.transpose() * x;
         const Eigen::Matrix3d jac_inv = jac.inverse();
-        const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx =
-            shape.dn * jac_inv.transpose();
+        const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = shape.dn * jac_inv.transpose();
         const Eigen::Matrix<double, 6, 1> eps =
             detail::strain_from_gradients(element, dndx, u);
         stress[element.nodes[a]] += d * eps;

@@ -144,8 +144,7 @@ std::pair<Eigen::Vector3f, std::string> resolve_sweep_axis(const pipeline::Model
 void capture_curve_spectrum(CinemaSizingStory& sizing) {
     sizing.curve_spectrum.clear();
     sizing.curve_mode_kept.clear();
-    if (sizing.stations.size() < 3 ||
-        sizing.stations.size() != sizing.curvature_raw.size()) {
+    if (sizing.stations.size() < 3 || sizing.stations.size() != sizing.curvature_raw.size()) {
         return;
     }
 
@@ -162,11 +161,10 @@ void capture_curve_spectrum(CinemaSizingStory& sizing) {
         if (it == sizing.stations.end()) {
             return sizing.curvature_raw.back();
         }
-        const std::size_t hi =
-            static_cast<std::size_t>(it - sizing.stations.begin());
+        const std::size_t hi = static_cast<std::size_t>(it - sizing.stations.begin());
         const std::size_t lo = hi - 1;
-        const double t = (station - sizing.stations[lo]) /
-                         (sizing.stations[hi] - sizing.stations[lo]);
+        const double t =
+            (station - sizing.stations[lo]) / (sizing.stations[hi] - sizing.stations[lo]);
         return sizing.curvature_raw[lo] +
                t * (sizing.curvature_raw[hi] - sizing.curvature_raw[lo]);
     };
@@ -175,8 +173,7 @@ void capture_curve_spectrum(CinemaSizingStory& sizing) {
     // geom::lowpass_signal before its FFT.
     std::vector<std::complex<double>> spectrum(2 * n);
     for (std::size_t i = 0; i < n; ++i) {
-        const double station =
-            static_cast<double>(i) / static_cast<double>(n - 1);
+        const double station = static_cast<double>(i) / static_cast<double>(n - 1);
         const std::complex<double> value{interpolate(station), 0.0};
         spectrum[i] = value;
         spectrum[2 * n - 1 - i] = value;
@@ -243,8 +240,7 @@ void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) 
         // Prefer a genuinely varying curvature trace; when every curved edge is
         // analytic-constant, still choose the strongest real curve rather than
         // drawing an invented spectrum.
-        const double score =
-            edge.length * (std::fabs(*hi - *lo) + 0.05 * mean);
+        const double score = edge.length * (std::fabs(*hi - *lo) + 0.05 * mean);
         if (score <= best_score) {
             continue;
         }
@@ -374,16 +370,14 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
                                             setup.p_elevate)
                     .h;
         }
-        const pipeline::RefinementPlan plan =
-            pipeline::build_refinement_plan(model, h, regions, setup.use_feature_grading,
-                                            setup.spectral_smooth, 0);
+        const pipeline::RefinementPlan plan = pipeline::build_refinement_plan(
+            model, h, regions, setup.use_feature_grading, setup.spectral_smooth, 0);
         std::optional<pipeline::RefinementPlan> baseline_plan;
         if (setup.spectral_smooth && plan.spectral.applied) {
             baseline_plan = pipeline::build_refinement_plan(
                 model, h, regions, setup.use_feature_grading, false, 0);
         }
-        const pipeline::RefinementPlan& baseline =
-            baseline_plan ? *baseline_plan : plan;
+        const pipeline::RefinementPlan& baseline = baseline_plan ? *baseline_plan : plan;
 
         state.sizing.prepared = true;
         state.sizing.brep_curvature = plan.geometry_curvature_from_brep;
@@ -392,9 +386,7 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
         state.sizing.h_min = plan.h_min;
         state.sizing.spectral = plan.spectral;
 
-        const auto valid_h = [](double value) {
-            return std::isfinite(value) && value > 0.0;
-        };
+        const auto valid_h = [](double value) { return std::isfinite(value) && value > 0.0; };
         const auto append_sample =
             [&](const Eigen::Vector3d& point, std::vector<Eigen::Vector3d>& points,
                 std::vector<double>& before, std::vector<double>& after) {
@@ -416,8 +408,7 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
         // separately and always keeps all of its samples.
         constexpr std::size_t kMaxFieldSamples = 1800;
         const std::size_t stride = std::max<std::size_t>(
-            1, (model.surface.vertices.size() + kMaxFieldSamples - 1) /
-                   kMaxFieldSamples);
+            1, (model.surface.vertices.size() + kMaxFieldSamples - 1) / kMaxFieldSamples);
         for (std::size_t i = 0; i < model.surface.vertices.size(); i += stride) {
             append_sample(model.surface.vertices[i], state.sizing.field_points,
                           state.sizing.field_h_before, state.sizing.field_h_after);
@@ -437,11 +428,9 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
             const auto [lo, hi] = std::minmax_element(values.begin(), values.end());
             return std::pair{*lo, *hi};
         };
-        std::tie(state.sizing.sampled_h_before_min,
-                 state.sizing.sampled_h_before_max) =
+        std::tie(state.sizing.sampled_h_before_min, state.sizing.sampled_h_before_max) =
             range(state.sizing.field_h_before);
-        std::tie(state.sizing.sampled_h_after_min,
-                 state.sizing.sampled_h_after_max) =
+        std::tie(state.sizing.sampled_h_after_min, state.sizing.sampled_h_after_max) =
             range(state.sizing.field_h_after);
     } catch (const std::exception&) {
         // The worker remains authoritative and will report the actual failure.

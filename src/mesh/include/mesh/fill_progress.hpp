@@ -23,7 +23,7 @@ inline thread_local FillProgressScope* active_fill_progress = nullptr;
 /// caller on exit; an empty observer suppresses even an enclosing observer.
 /// No timer thread: a blocked CAD/kernel call remains honestly silent.
 class FillProgressScope {
-public:
+  public:
     explicit FillProgressScope(const FillOptions& options,
                                const FillProgressTets* tets = nullptr)
         : options_(options), previous_(active_fill_progress), tets_(tets) {
@@ -43,20 +43,25 @@ public:
 
     /// Numbered phases encode actual wave/pass position, not invented elements.
     void set_phase(std::string_view name, int pass = 0, int total = 0) {
-        if (!options_.on_progress) return;
-        progress_.sub_phase = total > 0 ? std::format("{} {}/{}", name, pass, total)
-                                       : std::string(name);
+        if (!options_.on_progress)
+            return;
+        progress_.sub_phase =
+            total > 0 ? std::format("{} {}/{}", name, pass, total) : std::string(name);
         poll(true);
     }
 
     void poll(bool force = false) {
-        if (!options_.on_progress) return;
+        if (!options_.on_progress)
+            return;
         const auto now = std::chrono::steady_clock::now();
         // Four seconds leaves room for the next unit of synchronous work.
-        if (!force && now - last_ < std::chrono::seconds(4)) return;
+        if (!force && now - last_ < std::chrono::seconds(4))
+            return;
         last_ = now;
-        if (tets_ != nullptr) progress_.elements_so_far = tets_->size();
-        if (removed_ != nullptr) progress_.elements_so_far -= *removed_;
+        if (tets_ != nullptr)
+            progress_.elements_so_far = tets_->size();
+        if (removed_ != nullptr)
+            progress_.elements_so_far -= *removed_;
         // Consumer work must not recursively poll this observer. Its own nested
         // fill can still install an independent scope and will restore nullptr.
         struct CallbackScope {
@@ -67,7 +72,7 @@ public:
         options_.on_progress(progress_);
     }
 
-private:
+  private:
     friend class FillProgressElementsScope;
     const FillOptions& options_;
     FillProgressScope* previous_;
@@ -80,7 +85,7 @@ private:
 /// Temporarily bind the live mesh while a helper owns moved-in vectors. A
 /// deletion pass may supply its actual tombstone count until compaction ends.
 class FillProgressElementsScope {
-public:
+  public:
     explicit FillProgressElementsScope(const FillProgressTets& tets,
                                        const std::size_t* removed = nullptr)
         : scope_(active_fill_progress), tets_(scope_ != nullptr ? scope_->tets_ : nullptr),
@@ -99,7 +104,7 @@ public:
     FillProgressElementsScope(const FillProgressElementsScope&) = delete;
     FillProgressElementsScope& operator=(const FillProgressElementsScope&) = delete;
 
-private:
+  private:
     FillProgressScope* scope_;
     const FillProgressTets* tets_;
     const std::size_t* removed_;
@@ -107,7 +112,8 @@ private:
 
 /// Cheap disabled path: no clock read, allocation, or counter scan.
 inline void fill_progress_poll() {
-    if (active_fill_progress != nullptr) active_fill_progress->poll();
+    if (active_fill_progress != nullptr)
+        active_fill_progress->poll();
 }
 
 inline void fill_progress_poll(std::size_t done, std::size_t total) {

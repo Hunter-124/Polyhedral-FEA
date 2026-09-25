@@ -59,8 +59,8 @@ void repair_round(GradedFillState& s, bool collisions_only) {
         constexpr double kProjectionTravelFraction = 0.95;
         for (int a = 0; a < 4; ++a) {
             for (int b = a + 1; b < 4; ++b) {
-                const double spacing = std::min(original_spacing[tet[a]],
-                                                 original_spacing[tet[b]]);
+                const double spacing =
+                    std::min(original_spacing[tet[a]], original_spacing[tet[b]]);
                 if ((out.mesh.nodes[tet[a]] - out.mesh.nodes[tet[b]]).norm() <
                     (1.0 - kProjectionTravelFraction) * spacing)
                     return true;
@@ -95,7 +95,9 @@ void repair_round(GradedFillState& s, bool collisions_only) {
     bool collapsed_any = false;
     for (int pass = 0; pass < kCollapsePasses; ++pass) {
         progress.set_cells(0, out.mesh.tets.size());
-        progress.set_phase(collisions_only ? "quality_collision_pass" : "quality_collapse_pass", pass + 1, kCollapsePasses);
+        progress.set_phase(collisions_only ? "quality_collision_pass"
+                                           : "quality_collapse_pass",
+                           pass + 1, kCollapsePasses);
         // `try_collapse` checks that no incident tet inverts or degrades,
         // which is necessary and not sufficient: an edge collapse also has
         // to satisfy the link condition, or it welds the complex to itself
@@ -115,8 +117,7 @@ void repair_round(GradedFillState& s, bool collisions_only) {
             for (const auto& t : out.mesh.tets) {
                 fill_progress_poll();
                 v += std::abs(tet_signed_volume(out.mesh.nodes[t[0]], out.mesh.nodes[t[1]],
-                                                out.mesh.nodes[t[2]],
-                                                out.mesh.nodes[t[3]]));
+                                                out.mesh.nodes[t[2]], out.mesh.nodes[t[3]]));
             }
             return v;
         };
@@ -151,7 +152,7 @@ void repair_round(GradedFillState& s, bool collisions_only) {
             }
             double worst = std::numeric_limits<double>::infinity();
             for (const auto tj : it->second) {
-            fill_progress_poll();
+                fill_progress_poll();
                 if (removed[tj]) {
                     continue;
                 }
@@ -313,62 +314,64 @@ void repair_round(GradedFillState& s, bool collisions_only) {
         // Phase A — void juts: boundary nodes whose projection the snap had
         // to reject (hole-rim stair chords poking into the void) merge into
         // an adjacent on-surface boundary node instead of leaving a spike.
-        if (!collisions_only) for (std::size_t work_done = 0; const auto ni : bvec) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, bvec.size());
-            if (node_remap[ni] != ni || !initial_juts.contains(ni)) {
-                continue;
-            }
-            const double resid = surface_distance(surface, mirror, out.mesh.nodes[ni]);
-            if (resid <= 0.15 * hc) {
-                continue;
-            }
-            const auto it = incident.find(ni);
-            if (it == incident.end()) {
-                continue;
-            }
-            std::vector<std::pair<double, std::uint32_t>> cand;
-            for (const auto tj : it->second) {
-                fill_progress_poll();
-                if (removed[tj]) {
+        if (!collisions_only)
+            for (std::size_t work_done = 0; const auto ni : bvec) {
+                if (active_fill_progress != nullptr)
+                    fill_progress_poll(work_done++, bvec.size());
+                if (node_remap[ni] != ni || !initial_juts.contains(ni)) {
                     continue;
                 }
-                for (const auto nn : out.mesh.tets[tj]) {
-                    if (nn == ni || !bset.count(nn)) {
+                const double resid = surface_distance(surface, mirror, out.mesh.nodes[ni]);
+                if (resid <= 0.15 * hc) {
+                    continue;
+                }
+                const auto it = incident.find(ni);
+                if (it == incident.end()) {
+                    continue;
+                }
+                std::vector<std::pair<double, std::uint32_t>> cand;
+                for (const auto tj : it->second) {
+                    fill_progress_poll();
+                    if (removed[tj]) {
                         continue;
                     }
-                    cand.push_back({(out.mesh.nodes[nn] - out.mesh.nodes[ni]).norm(), nn});
+                    for (const auto nn : out.mesh.tets[tj]) {
+                        if (nn == ni || !bset.count(nn)) {
+                            continue;
+                        }
+                        cand.push_back({(out.mesh.nodes[nn] - out.mesh.nodes[ni]).norm(), nn});
+                    }
+                }
+                // Distance ties break on the mirror key, not the node id, so a
+                // jut and its mirror image merge toward mirrored neighbours. The
+                // length itself is compared through `tie_key`: mirrored lengths
+                // agree only to the last ulp, and ordering on that noise is what
+                // sent mirrored juts to unmirrored survivors (ADR-0036).
+                std::sort(cand.begin(), cand.end(), [&](const auto& x, const auto& y) {
+                    const auto lx = tie_key(x.first, hc);
+                    const auto ly = tie_key(y.first, hc);
+                    if (lx != ly) {
+                        return lx < ly;
+                    }
+                    const auto kx = mkey.key(out.mesh.nodes[x.second]);
+                    const auto ky = mkey.key(out.mesh.nodes[y.second]);
+                    return kx != ky ? kx < ky : x.second < y.second;
+                });
+                cand.erase(std::unique(cand.begin(), cand.end(),
+                                       [](const auto& x, const auto& y) {
+                                           return x.second == y.second;
+                                       }),
+                           cand.end());
+                for (const auto& [len, surv] : cand) {
+                    fill_progress_poll();
+                    if (surface_distance(surface, mirror, out.mesh.nodes[surv]) > 0.05 * hc) {
+                        continue;
+                    }
+                    if (collapse_orbit(ni, surv)) {
+                        break;
+                    }
                 }
             }
-            // Distance ties break on the mirror key, not the node id, so a
-            // jut and its mirror image merge toward mirrored neighbours. The
-            // length itself is compared through `tie_key`: mirrored lengths
-            // agree only to the last ulp, and ordering on that noise is what
-            // sent mirrored juts to unmirrored survivors (ADR-0036).
-            std::sort(cand.begin(), cand.end(), [&](const auto& x, const auto& y) {
-                const auto lx = tie_key(x.first, hc);
-                const auto ly = tie_key(y.first, hc);
-                if (lx != ly) {
-                    return lx < ly;
-                }
-                const auto kx = mkey.key(out.mesh.nodes[x.second]);
-                const auto ky = mkey.key(out.mesh.nodes[y.second]);
-                return kx != ky ? kx < ky : x.second < y.second;
-            });
-            cand.erase(std::unique(cand.begin(), cand.end(),
-                                   [](const auto& x, const auto& y) {
-                                       return x.second == y.second;
-                                   }),
-                       cand.end());
-            for (const auto& [len, surv] : cand) {
-                fill_progress_poll();
-                if (surface_distance(surface, mirror, out.mesh.nodes[surv]) > 0.05 * hc) {
-                    continue;
-                }
-                if (collapse_orbit(ni, surv)) {
-                    break;
-                }
-            }
-        }
 
         // Phase B — sliver caps: collapse the shortest viable edge of the
         // worst cap first. Index order fails the sphere residual and
@@ -378,8 +381,8 @@ void repair_round(GradedFillState& s, bool collisions_only) {
         const auto& mkey_b = mkey;
         const auto tet_center_b = [&](std::size_t ti) {
             const auto& n = out.mesh.tets[ti];
-            return 0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] +
-                           out.mesh.nodes[n[2]] + out.mesh.nodes[n[3]]);
+            return 0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] + out.mesh.nodes[n[2]] +
+                           out.mesh.nodes[n[3]]);
         };
         std::vector<std::size_t> cap_order;
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
@@ -400,7 +403,8 @@ void repair_round(GradedFillState& s, bool collisions_only) {
             return ka != kb ? ka < kb : a < b;
         });
         for (std::size_t work_done = 0; const auto ti : cap_order) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, cap_order.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, cap_order.size());
             if (removed[ti] || aspect_of(out.mesh.tets[ti]) >= kCapAspect) {
                 continue;
             }
@@ -433,19 +437,18 @@ void repair_round(GradedFillState& s, bool collisions_only) {
                 const auto k1 = mkey.key(out.mesh.nodes[e[1]]);
                 return k1 < k0 ? EdgeMirrorKey{{k1, k0}} : EdgeMirrorKey{{k0, k1}};
             };
-            std::sort(edges_len.begin(), edges_len.end(),
-                      [&](const auto& x, const auto& y) {
-                          const auto lx = tie_key(x.first, hc);
-                          const auto ly = tie_key(y.first, hc);
-                          if (lx != ly) {
-                              return lx < ly;
-                          }
-                          const auto kx = edge_mirror_key(x.second);
-                          const auto ky = edge_mirror_key(y.second);
-                          return kx != ky ? kx < ky
-                                          : std::min(x.second[0], x.second[1]) <
-                                                std::min(y.second[0], y.second[1]);
-                      });
+            std::sort(edges_len.begin(), edges_len.end(), [&](const auto& x, const auto& y) {
+                const auto lx = tie_key(x.first, hc);
+                const auto ly = tie_key(y.first, hc);
+                if (lx != ly) {
+                    return lx < ly;
+                }
+                const auto kx = edge_mirror_key(x.second);
+                const auto ky = edge_mirror_key(y.second);
+                return kx != ky ? kx < ky
+                                : std::min(x.second[0], x.second[1]) <
+                                      std::min(y.second[0], y.second[1]);
+            });
             bool done = false;
             for (int e = 0; e < ne && !done; ++e) {
                 const std::uint32_t a = edges_len[static_cast<std::size_t>(e)].second[0];

@@ -13,7 +13,9 @@
 #if defined(__linux__)
 #include <sys/sysinfo.h>
 #elif defined(_WIN32)
+// windows.h must precede psapi.h; the blank line keeps clang-format from sorting them.
 #include <windows.h>
+
 #include <psapi.h>
 #endif
 
@@ -207,9 +209,8 @@ SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Ind
                 sat_mul(sat_add(n_nodes_u, 1), 2 * sizeof(std::uint64_t)));
     // `assemble_stiffness` sizes its element-matrix scratch to this budget.
     constexpr std::uint64_t kAssemblyChunkBytes = 32ULL << 20;
-    out.assembly_workspace_bytes =
-        sat_add(sat_add(global_csr, pattern_scratch),
-                sat_add(kAssemblyChunkBytes, reduced_csr));
+    out.assembly_workspace_bytes = sat_add(sat_add(global_csr, pattern_scratch),
+                                           sat_add(kAssemblyChunkBytes, reduced_csr));
 
     const auto ndof_u = index_as_u64(out.ndof);
     const auto nfree_u = index_as_u64(out.nfree);

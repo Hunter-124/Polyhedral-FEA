@@ -284,9 +284,9 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
             "Each bar counts mesh nodes in a von Mises stress range; this is space, not time.";
         equation = {plain("K u = f   ·   ε = B u   ·   σ = D(E,ν) ε   ·   σ", palette.text),
                     sub("vm", palette.text), plain(" = equivalent stress", palette.text)};
-        live = fmt("peak %.4g MPa · mean over %s solved nodes",
-                   stage->result.max_von_mises / 1e6,
-                   grouped(stage->result.von_mises.size()).c_str());
+        live =
+            fmt("peak %.4g MPa · mean over %s solved nodes", stage->result.max_von_mises / 1e6,
+                grouped(stage->result.von_mises.size()).c_str());
         if (stage_index < state.stress_histograms.size()) {
             histogram = &state.stress_histograms[stage_index];
             histogram_unit = "MPa";
@@ -294,8 +294,8 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
         }
     } else if (stage != nullptr && on_gradient) {
         title = "Stress gradient — how quickly the field changes";
-        explain =
-            "Tall bars mean many nodes share that change rate; the far right locates sharp hot spots.";
+        explain = "Tall bars mean many nodes share that change rate; the far right locates "
+                  "sharp hot spots.";
         equation = {plain("|∇σ", palette.text), sub("vm", palette.text),
                     plain("| from a least-squares fit over each node's cells", palette.text)};
         const double gmax = const_cast<CinemaState&>(state).gradient_max(stage_index);
@@ -306,30 +306,29 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
         histogram_scale = 1e-9;
     } else if (stage != nullptr && on_error) {
         title = "Estimated discretisation error — is the mesh fine enough?";
-        explain =
-            "The measured ZZ indicator is compared with the requested stopping target.";
-        equation = {plain("η", palette.text), sub("e", palette.text),
+        explain = "The measured ZZ indicator is compared with the requested stopping target.";
+        equation = {plain("η", palette.text),          sub("e", palette.text),
                     plain(" = ‖σ* − σ", palette.text), sub("h", palette.text),
-                    plain("‖", palette.text), sub("E,e", palette.text),
-                    plain(" / ‖σ", palette.text), sub("h", palette.text),
-                    plain("‖", palette.text), sub("E,Ω", palette.text)};
+                    plain("‖", palette.text),          sub("E,e", palette.text),
+                    plain(" / ‖σ", palette.text),      sub("h", palette.text),
+                    plain("‖", palette.text),          sub("E,Ω", palette.text)};
         live = fmt("global estimate %.3g%% · target %.3g%%", stage->trace.global_eta * 100.0,
                    hud.eta_target * 100.0);
     } else if (stage != nullptr && on_refine) {
         title = "Adaptive refinement — spend cells where error is concentrated";
-        explain =
-            "The largest local indicators are marked first, then the next real mesh replaces them.";
-        equation = {plain("Σ", palette.text), sub("marked", palette.text),
+        explain = "The largest local indicators are marked first, then the next real mesh "
+                  "replaces them.";
+        equation = {plain("Σ", palette.text),  sub("marked", palette.text),
                     plain(" η", palette.text), sub("e", palette.text),
-                    sup("2", palette.text), plain(" ≥ θ Σ", palette.text),
-                    sub("all", palette.text), plain(" η", palette.text),
-                    sub("e", palette.text), sup("2", palette.text)};
+                    sup("2", palette.text),    plain(" ≥ θ Σ", palette.text),
+                    sub("all", palette.text),  plain(" η", palette.text),
+                    sub("e", palette.text),    sup("2", palette.text)};
         live = fmt("%s cells marked · pass %zu → pass %zu",
                    grouped(stage->trace.n_h_mark).c_str(), stage_index, stage_index + 1);
     } else if (stage != nullptr && on_ramp) {
         title = "Load response — force, stress and deflection rise together";
-        explain =
-            "Linear elastostatics puts stress and displacement on the same exact straight line.";
+        explain = "Linear elastostatics puts stress and displacement on the same exact "
+                  "straight line.";
         equation = {plain("u(λ) = λu   ·   σ(λ) = λσ   ·   f(λ) = λf", palette.text)};
         live = fmt("λ %.3f · %.4g kN · %.4g MPa · %.4g mm physical deflection",
                    cue.load_factor, cue.load_factor * hud.load_newtons / 1e3,
@@ -342,24 +341,21 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
                              ? "direct LDLT"
                              : (token == "cg" ? "conjugate gradient" : "method not reported");
     if (stage != nullptr) {
-        technical = fmt("%s unknowns · %s · E %.6g GPa · ν %.4g",
-                        grouped(stage->trace.n_dof).c_str(), method,
-                        hud.youngs_modulus / 1e9, hud.poissons_ratio);
+        technical =
+            fmt("%s unknowns · %s · E %.6g GPa · ν %.4g", grouped(stage->trace.n_dof).c_str(),
+                method, hud.youngs_modulus / 1e9, hud.poissons_ratio);
     }
 
     dl->AddText(font, type.caption, origin, faded(palette.text, alpha), title.c_str());
-    dl->AddText(font, type.legend,
-                ImVec2(origin.x, origin.y + type.caption * 1.45f),
+    dl->AddText(font, type.legend, ImVec2(origin.x, origin.y + type.caption * 1.45f),
                 faded(palette.text_dim, alpha), explain.c_str(), nullptr, region.x);
     const float equation_y = origin.y + type.caption * 3.05f;
     const float equation_w = runs_width(font, type.caption, equation);
-    const float equation_size =
-        equation_w > region.x && equation_w > 0.0f
-            ? std::max(12.0f, type.caption * region.x / equation_w)
-            : type.caption;
+    const float equation_size = equation_w > region.x && equation_w > 0.0f
+                                    ? std::max(12.0f, type.caption * region.x / equation_w)
+                                    : type.caption;
     draw_runs(dl, font, equation_size, ImVec2(origin.x, equation_y), equation, alpha);
-    dl->AddText(font, type.label,
-                ImVec2(origin.x, equation_y + type.caption * 1.45f),
+    dl->AddText(font, type.label, ImVec2(origin.x, equation_y + type.caption * 1.45f),
                 faded(palette.accent, alpha), live.c_str(), nullptr, region.x);
 
     const float pipeline_h = type.legend * 4.8f;
@@ -377,8 +373,8 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     const float bottom = chart_max.y - 38.0f;
     for (int i = 1; i < 4; ++i) {
         const float y = top + (bottom - top) * static_cast<float>(i) / 4.0f;
-        dl->AddLine(ImVec2(left, y), ImVec2(right, y),
-                    faded(palette.border, 0.42f * alpha), 1.0f);
+        dl->AddLine(ImVec2(left, y), ImVec2(right, y), faded(palette.border, 0.42f * alpha),
+                    1.0f);
     }
     dl->AddLine(ImVec2(left, bottom), ImVec2(right, bottom),
                 faded(palette.text_dim, 0.75f * alpha), 1.2f);
@@ -390,27 +386,24 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
         const float plot_h = bottom - top;
         const float slot = plot_w / static_cast<float>(histogram->bins.size());
         for (std::size_t i = 0; i < histogram->bins.size(); ++i) {
-            const float height =
-                plot_h * static_cast<float>(histogram->bins[i]) /
-                static_cast<float>(histogram->tallest_bin);
+            const float height = plot_h * static_cast<float>(histogram->bins[i]) /
+                                 static_cast<float>(histogram->tallest_bin);
             const float x0 = left + static_cast<float>(i) * slot + 1.0f;
             const float x1 = left + static_cast<float>(i + 1) * slot - 1.0f;
-            const float t = (static_cast<float>(i) + 0.5f) /
-                            static_cast<float>(histogram->bins.size());
+            const float t =
+                (static_cast<float>(i) + 0.5f) / static_cast<float>(histogram->bins.size());
             dl->AddRectFilled(ImVec2(x0, bottom - height), ImVec2(x1, bottom),
                               rgba(fea_colormap(t), 0.82f * alpha), 2.0f);
         }
         const double span = histogram->p99 - histogram->min;
-        const float mean_x = span > 0.0
-                                 ? left + (right - left) * std::clamp(
-                                                                    static_cast<float>(
-                                                                        (histogram->mean -
-                                                                         histogram->min) /
-                                                                        span),
-                                                                    0.0f, 1.0f)
-                                 : left;
-        dl->AddLine(ImVec2(mean_x, top), ImVec2(mean_x, bottom),
-                    faded(palette.accent, alpha), 2.0f);
+        const float mean_x =
+            span > 0.0 ? left + (right - left) *
+                                    std::clamp(static_cast<float>(
+                                                   (histogram->mean - histogram->min) / span),
+                                               0.0f, 1.0f)
+                       : left;
+        dl->AddLine(ImVec2(mean_x, top), ImVec2(mean_x, bottom), faded(palette.accent, alpha),
+                    2.0f);
         const std::string minimum =
             fmt("%.3g %s", histogram->min * histogram_scale, histogram_unit);
         const std::string maximum =
@@ -419,12 +412,10 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
             fmt("mean %.3g %s", histogram->mean * histogram_scale, histogram_unit);
         dl->AddText(font, type.legend, ImVec2(left, bottom + 8.0f),
                     faded(palette.text_dim, alpha), minimum.c_str());
-        const float max_w =
-            font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, maximum.c_str()).x;
+        const float max_w = font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, maximum.c_str()).x;
         dl->AddText(font, type.legend, ImVec2(right - max_w, bottom + 8.0f),
                     faded(palette.text_dim, alpha), maximum.c_str());
-        const float mean_w =
-            font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, mean.c_str()).x;
+        const float mean_w = font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, mean.c_str()).x;
         dl->AddText(font, type.legend,
                     ImVec2(std::min(mean_x + 5.0f, right - mean_w), top + 4.0f),
                     faded(palette.accent, alpha), mean.c_str());
@@ -446,8 +437,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
             dl->AddText(font, type.label,
                         ImVec2(x - 0.5f * bar_w, bottom - h - type.label * 1.35f),
                         faded(colors[i], alpha), value.c_str());
-            dl->AddText(font, type.legend,
-                        ImVec2(x - 0.5f * bar_w, bottom + 8.0f),
+            dl->AddText(font, type.legend, ImVec2(x - 0.5f * bar_w, bottom + 8.0f),
                         faded(palette.text_dim, alpha), labels[i]);
         }
     } else if (stage != nullptr && on_refine) {
@@ -461,20 +451,16 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
         const float bar_w = (right - left) * 0.24f;
         for (std::size_t i = 0; i < counts.size(); ++i) {
             const float x = left + (right - left) * (0.24f + 0.52f * static_cast<float>(i));
-            const float h = (bottom - top) * static_cast<float>(counts[i]) /
-                            static_cast<float>(max_count);
-            dl->AddRectFilled(ImVec2(x - 0.5f * bar_w, bottom - h),
-                              ImVec2(x + 0.5f * bar_w, bottom),
-                              faded(i == 0 ? palette.text_dim : palette.accent,
-                                    0.82f * alpha),
-                              5.0f);
+            const float h =
+                (bottom - top) * static_cast<float>(counts[i]) / static_cast<float>(max_count);
+            dl->AddRectFilled(
+                ImVec2(x - 0.5f * bar_w, bottom - h), ImVec2(x + 0.5f * bar_w, bottom),
+                faded(i == 0 ? palette.text_dim : palette.accent, 0.82f * alpha), 5.0f);
             const std::string value = grouped(counts[i]) + " cells";
             dl->AddText(font, type.label,
                         ImVec2(x - 0.5f * bar_w, bottom - h - type.label * 1.35f),
-                        faded(i == 0 ? palette.text : palette.accent, alpha),
-                        value.c_str());
-            dl->AddText(font, type.legend,
-                        ImVec2(x - 0.5f * bar_w, bottom + 8.0f),
+                        faded(i == 0 ? palette.text : palette.accent, alpha), value.c_str());
+            dl->AddText(font, type.legend, ImVec2(x - 0.5f * bar_w, bottom + 8.0f),
                         faded(palette.text_dim, alpha), labels[i]);
         }
     } else if (stage != nullptr && on_ramp) {
@@ -485,16 +471,14 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
         const float x = left + (right - left) * static_cast<float>(cue.load_factor);
         const float y = bottom - (bottom - top) * static_cast<float>(cue.load_factor);
         dl->AddCircleFilled(ImVec2(x, y), 9.0f, faded(palette.accent, alpha));
-        dl->AddCircle(ImVec2(x, y), 15.0f,
-                      faded(palette.accent_soft_top, 0.55f * alpha), 0, 2.0f);
+        dl->AddCircle(ImVec2(x, y), 15.0f, faded(palette.accent_soft_top, 0.55f * alpha), 0,
+                      2.0f);
         dl->AddText(font, type.legend, ImVec2(left, bottom + 8.0f),
                     faded(palette.text_dim, alpha), "0 load");
-        dl->AddText(font, type.legend,
-                    ImVec2(right - type.legend * 4.3f, bottom + 8.0f),
+        dl->AddText(font, type.legend, ImVec2(right - type.legend * 4.3f, bottom + 8.0f),
                     faded(palette.text_dim, alpha), "full load");
         dl->AddText(font, type.label, ImVec2(left + 8.0f, top + 8.0f),
-                    faded(palette.text, alpha),
-                    "stress ratio = displacement ratio = λ");
+                    faded(palette.text, alpha), "stress ratio = displacement ratio = λ");
     }
 
     static constexpr std::array<const char*, 6> kSteps{
@@ -517,19 +501,15 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     for (std::size_t i = 0; i < kSteps.size(); ++i) {
         const float x = origin.x + static_cast<float>(i) * (chip_w + gap);
         const bool lit_step = static_cast<int>(i) == active;
-        dl->AddRectFilled(ImVec2(x, chips_y),
-                          ImVec2(x + chip_w, chips_y + type.legend * 2.0f),
+        dl->AddRectFilled(ImVec2(x, chips_y), ImVec2(x + chip_w, chips_y + type.legend * 2.0f),
                           faded(lit_step ? palette.accent_mid : palette.panel_bg,
                                 alpha * (lit_step ? 0.82f : 0.55f)),
                           5.0f);
-        dl->AddText(font, type.legend,
-                    ImVec2(x + 7.0f, chips_y + type.legend * 0.42f),
-                    faded(lit_step ? palette.text : palette.text_dim, alpha),
-                    kSteps[i]);
+        dl->AddText(font, type.legend, ImVec2(x + 7.0f, chips_y + type.legend * 0.42f),
+                    faded(lit_step ? palette.text : palette.text_dim, alpha), kSteps[i]);
     }
     if (!technical.empty()) {
-        dl->AddText(font, type.legend,
-                    ImVec2(origin.x, chips_y + type.legend * 2.45f),
+        dl->AddText(font, type.legend, ImVec2(origin.x, chips_y + type.legend * 2.45f),
                     faded(palette.text_dim, alpha), technical.c_str(), nullptr, region.x);
     }
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
@@ -666,8 +646,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
             caption =
                 "the measured pass that chose this mesh — replayed while its real cells land";
         } else if (state.decision_vetoed) {
-            caption =
-                "the measured OOD check — the configured baseline remains active";
+            caption = "the measured OOD check — the configured baseline remains active";
         } else if (state.decision_unrecognized) {
             caption =
                 "the measured pass named an unavailable mesher — the studio setup remains";
@@ -722,13 +701,12 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     // remain circles because positions, never node geometry, are transformed.
     constexpr float kSidePad = 14.0f;
     const float header_h = std::floor(type.legend * 1.25f);
-    const float chip_h =
-        frame != nullptr
-            ? std::floor(type.label * (state.decision_applied ? 3.0f : 4.5f))
-            : 0.0f;
+    const float chip_h = frame != nullptr
+                             ? std::floor(type.label * (state.decision_applied ? 3.0f : 4.5f))
+                             : 0.0f;
     const float lanes_top = graph_top + header_h;
-    const float lanes_h = std::max(
-        120.0f, graph_h - header_h - chip_h - std::floor(type.legend * 0.6f));
+    const float lanes_h =
+        std::max(120.0f, graph_h - header_h - chip_h - std::floor(type.legend * 0.6f));
     const float lane_h = lanes_h / static_cast<float>(values.size());
     const float band_w = std::max(120.0f, region.x - 2.0f * kSidePad);
     const auto row_y = [&](std::size_t layer) {
@@ -747,9 +725,8 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         float at = lane;
         if (cue.pass_lane_live) {
             const double beat = std::max(cue.pass_beat_seconds, 1.0e-6);
-            at = static_cast<float>(
-                std::fmod(std::max(cue.act_t, 0.0) / beat, 1.0) *
-                static_cast<double>(values.size() - 1));
+            at = static_cast<float>(std::fmod(std::max(cue.act_t, 0.0) / beat, 1.0) *
+                                    static_cast<double>(values.size() - 1));
         } else if (replaying) {
             at = static_cast<float>(cue.activation_wave) *
                  static_cast<float>(values.size() - 1);
@@ -773,11 +750,11 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
                           faded(l == 3 ? palette.accent : palette.panel_bg,
                                 (l == 3 ? 0.028f : 0.055f) * pulse * alpha),
                           5.0f);
-        dl->AddLine(ImVec2(origin.x + kSidePad, row_y(l)),
-                    ImVec2(origin.x + region.x - kSidePad, row_y(l)),
-                    faded(l == 3 ? palette.accent : palette.text_dim,
-                          (0.08f + 0.10f * pulse) * alpha),
-                    1.0f);
+        dl->AddLine(
+            ImVec2(origin.x + kSidePad, row_y(l)),
+            ImVec2(origin.x + region.x - kSidePad, row_y(l)),
+            faded(l == 3 ? palette.accent : palette.text_dim, (0.08f + 0.10f * pulse) * alpha),
+            1.0f);
     }
 
     // ---- connections ----------------------------------------------------
@@ -791,8 +768,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
             const float pulse = wave_strength(static_cast<float>(b) + 0.5f);
             dl->AddLine(node_point(b, static_cast<std::size_t>(pick.src)),
                         node_point(b + 1, static_cast<std::size_t>(pick.dst)),
-                        rgba(signed_colormap(t),
-                             (0.04f + 0.86f * weight) * pulse * alpha),
+                        rgba(signed_colormap(t), (0.04f + 0.86f * weight) * pulse * alpha),
                         0.55f + 1.55f * weight);
         }
     }
@@ -811,8 +787,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         const float r_max = std::clamp(0.46f * spacing, 2.6f, kNodeRadiusMax);
         const std::string header = std::format("{} · {} units", kLanePlain[l], layer.size);
         dl->AddText(font, type.legend,
-                    ImVec2(origin.x + kSidePad,
-                           lanes_top + lane_h * static_cast<float>(l)),
+                    ImVec2(origin.x + kSidePad, lanes_top + lane_h * static_cast<float>(l)),
                     faded(l == 3 ? palette.accent : palette.text_dim,
                           alpha * wave_strength(static_cast<float>(l))),
                     header.c_str());
@@ -824,13 +799,10 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
             const ImVec2 point = node_point(l, i);
             const auto rgb = signed_colormap(a / layer_max[l]);
             if (mag > 0.30f) {
-                dl->AddCircleFilled(point, r * 3.0f,
-                                    rgba(rgb, 0.065f * mag * pulse * alpha));
-                dl->AddCircleFilled(point, r * 1.8f,
-                                    rgba(rgb, 0.125f * mag * pulse * alpha));
+                dl->AddCircleFilled(point, r * 3.0f, rgba(rgb, 0.065f * mag * pulse * alpha));
+                dl->AddCircleFilled(point, r * 1.8f, rgba(rgb, 0.125f * mag * pulse * alpha));
             }
-            dl->AddCircleFilled(point, r,
-                                rgba(rgb, (0.42f + 0.58f * mag) * alpha));
+            dl->AddCircleFilled(point, r, rgba(rgb, (0.42f + 0.58f * mag) * alpha));
             const bool chosen_head = l == 3 && static_cast<int>(i) == winner;
             if (mag > 0.55f || chosen_head) {
                 dl->AddCircle(point, r + (chosen_head ? 3.0f : 1.4f),
@@ -849,14 +821,12 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         dl->AddRectFilled(ImVec2(origin.x, chip_top),
                           ImVec2(origin.x + region.x, chip_top + chip_h),
                           faded(palette.panel_bg, 0.72f * alpha), 7.0f);
-        dl->AddRect(ImVec2(origin.x, chip_top),
-                    ImVec2(origin.x + region.x, chip_top + chip_h),
+        dl->AddRect(ImVec2(origin.x, chip_top), ImVec2(origin.x + region.x, chip_top + chip_h),
                     faded(palette.accent, 0.75f * alpha), 7.0f, 0, 1.4f);
         std::string selected = "ADVISOR RESULT UNAVAILABLE";
         if (state.decision_applied) {
-            selected = winner >= 0
-                           ? std::format("SELECTED  {}", winner_text)
-                           : std::string("SELECTED  action head unavailable");
+            selected = winner >= 0 ? std::format("SELECTED  {}", winner_text)
+                                   : std::string("SELECTED  action head unavailable");
         } else if (state.decision_vetoed) {
             selected = "ADVISOR ABSTAINED  ·  configured baseline remains active";
         } else if (state.decision_unrecognized) {
@@ -868,12 +838,10 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
             state.decision_applied
                 ? fmt("%s · h/L %.3g · order %d · %d adapt pass%s",
                       std::string(mesher_plain(frame->action.mesher)).c_str(),
-                      frame->action.h_rel, frame->action.order,
-                      frame->action.adapt_passes,
+                      frame->action.h_rel, frame->action.order, frame->action.adapt_passes,
                       frame->action.adapt_passes == 1 ? "" : "es")
                 : state.decision_note;
-        dl->AddText(font, type.legend,
-                    ImVec2(origin.x + 12.0f, chip_top + type.label * 1.65f),
+        dl->AddText(font, type.legend, ImVec2(origin.x + 12.0f, chip_top + type.label * 1.65f),
                     faded(state.decision_applied ? palette.text : palette.status_warn, alpha),
                     action.c_str(), nullptr, region.x - 24.0f);
     }
@@ -895,13 +863,11 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
     const ImVec2 region = ImGui::GetContentRegionAvail();
     const float wrap = std::max(120.0f, region.x);
 
-    const bool curvature_sizing =
-        state.sizing.spectral.applied && state.sizing.brep_curvature;
+    const bool curvature_sizing = state.sizing.spectral.applied && state.sizing.brep_curvature;
     const bool bc_sizing = state.sizing.spectral.applied && state.sizing.bc_seeds > 0;
     dl->AddText(font, type.caption, origin, faded(palette.text, alpha),
-                curvature_sizing
-                    ? "Exact curvature → frequency modes → target spacing"
-                    : "Exact curvature study · support/load target spacing");
+                curvature_sizing ? "Exact curvature → frequency modes → target spacing"
+                                 : "Exact curvature study · support/load target spacing");
     const std::string summary =
         state.sizing.spectral.applied
             ? fmt("%s / %s field modes · %.2f%% energy · N density %.0f → %.0f",
@@ -911,9 +877,10 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                   state.sizing.spectral.predicted_before,
                   state.sizing.spectral.predicted_after)
             : std::string("uniform solve · FFT is geometry evidence, not a sizing input");
-    dl->AddText(font, type.label, ImVec2(origin.x, origin.y + type.caption * 1.55f),
-                faded(state.sizing.spectral.applied ? palette.accent : palette.text_dim, alpha),
-                summary.c_str(), nullptr, wrap);
+    dl->AddText(
+        font, type.label, ImVec2(origin.x, origin.y + type.caption * 1.55f),
+        faded(state.sizing.spectral.applied ? palette.accent : palette.text_dim, alpha),
+        summary.c_str(), nullptr, wrap);
     const std::string rings =
         fmt("%s on-part samples · ring diameter = target h · orange fine → cyan coarse",
             grouped(state.sizing.field_points.size()).c_str());
@@ -921,20 +888,18 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                 faded(palette.text_dim, alpha), rings.c_str(), nullptr, wrap);
 
     const float chart_top = origin.y + type.caption * 3.65f;
-    const float chart_h = std::max(
-        240.0f, region.y - (chart_top - origin.y) - type.label * 6.0f);
+    const float chart_h =
+        std::max(240.0f, region.y - (chart_top - origin.y) - type.label * 6.0f);
     const float chart_w = std::max(120.0f, region.x);
     dl->AddRectFilled(ImVec2(origin.x, chart_top),
                       ImVec2(origin.x + chart_w, chart_top + chart_h),
                       faded(palette.panel_bg, 0.52f * alpha), 6.0f);
-    dl->AddRect(ImVec2(origin.x, chart_top),
-                ImVec2(origin.x + chart_w, chart_top + chart_h),
+    dl->AddRect(ImVec2(origin.x, chart_top), ImVec2(origin.x + chart_w, chart_top + chart_h),
                 faded(palette.border, 0.8f * alpha), 6.0f);
 
     const float pad = 13.0f;
     const float split_y = chart_top + chart_h * 0.58f;
-    dl->AddLine(ImVec2(origin.x + pad, split_y),
-                ImVec2(origin.x + chart_w - pad, split_y),
+    dl->AddLine(ImVec2(origin.x + pad, split_y), ImVec2(origin.x + chart_w - pad, split_y),
                 faded(palette.border, 0.72f * alpha), 1.0f);
     dl->AddText(font, type.legend, ImVec2(origin.x + pad, chart_top + 8.0f),
                 faded(palette.text_dim, alpha), "SIGNAL DOMAIN  κ(s) along selected CAD edge");
@@ -956,25 +921,22 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         const float plot_top = chart_top + type.legend * 1.65f;
         const float plot_bottom = split_y - 10.0f;
         const auto point = [&](double station, double value) {
-            const float x = origin.x + pad +
-                            (chart_w - 2.0f * pad) * static_cast<float>(station);
+            const float x =
+                origin.x + pad + (chart_w - 2.0f * pad) * static_cast<float>(station);
             const float y = plot_bottom -
                             (plot_bottom - plot_top) * static_cast<float>((value - lo) / span);
             return ImVec2(x, y);
         };
 
-        const double revealed =
-            cue.spectral_edge_reveal * static_cast<double>(raw.size() - 1);
+        const double revealed = cue.spectral_edge_reveal * static_cast<double>(raw.size() - 1);
         const std::size_t whole =
             std::min(static_cast<std::size_t>(std::floor(revealed)), raw.size() - 1);
         for (std::size_t i = 1; i <= whole; ++i) {
-            dl->AddLine(point(stations[i - 1], raw[i - 1]),
-                        point(stations[i], raw[i]),
+            dl->AddLine(point(stations[i - 1], raw[i - 1]), point(stations[i], raw[i]),
                         faded(palette.text_dim, 0.62f * alpha), 1.2f);
-            const double y0 = raw[i - 1] +
-                              cue.spectral_filter_mix * (filtered[i - 1] - raw[i - 1]);
-            const double y1 =
-                raw[i] + cue.spectral_filter_mix * (filtered[i] - raw[i]);
+            const double y0 =
+                raw[i - 1] + cue.spectral_filter_mix * (filtered[i - 1] - raw[i - 1]);
+            const double y1 = raw[i] + cue.spectral_filter_mix * (filtered[i] - raw[i]);
             dl->AddLine(point(stations[i - 1], y0), point(stations[i], y1),
                         faded(palette.accent, alpha), 2.6f);
             dl->AddCircleFilled(point(stations[i], y1), 2.6f,
@@ -984,17 +946,15 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
             const double part = revealed - static_cast<double>(whole);
             const double station =
                 stations[whole] + part * (stations[whole + 1] - stations[whole]);
-            const double raw_value =
-                raw[whole] + part * (raw[whole + 1] - raw[whole]);
+            const double raw_value = raw[whole] + part * (raw[whole + 1] - raw[whole]);
             const double filtered_value =
                 filtered[whole] + part * (filtered[whole + 1] - filtered[whole]);
             const double value =
                 raw_value + cue.spectral_filter_mix * (filtered_value - raw_value);
             dl->AddLine(point(stations[whole], raw[whole]), point(station, raw_value),
                         faded(palette.text_dim, 0.62f * alpha), 1.2f);
-            const double start = raw[whole] +
-                                 cue.spectral_filter_mix *
-                                     (filtered[whole] - raw[whole]);
+            const double start =
+                raw[whole] + cue.spectral_filter_mix * (filtered[whole] - raw[whole]);
             dl->AddLine(point(stations[whole], start), point(station, value),
                         faded(palette.accent, alpha), 2.6f);
             const ImVec2 scan = point(station, value);
@@ -1003,13 +963,11 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
             dl->AddCircleFilled(scan, 4.2f, faded(palette.accent_soft_top, alpha));
         }
         const std::string edge =
-            fmt("edge %u · %.3g mm · %s/%s curve modes",
-                state.sizing.edge_id, state.sizing.edge_length * 1e3,
-                grouped(state.sizing.curve_modes_kept).c_str(),
+            fmt("edge %u · %.3g mm · %s/%s curve modes", state.sizing.edge_id,
+                state.sizing.edge_length * 1e3, grouped(state.sizing.curve_modes_kept).c_str(),
                 grouped(state.sizing.curve_modes_total).c_str());
         const float ew = font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, edge.c_str()).x;
-        dl->AddText(font, type.legend,
-                    ImVec2(origin.x + chart_w - ew - pad, chart_top + 8.0f),
+        dl->AddText(font, type.legend, ImVec2(origin.x + chart_w - ew - pad, chart_top + 8.0f),
                     faded(palette.accent, alpha), edge.c_str());
     } else {
         dl->AddText(font, type.label, ImVec2(origin.x + pad, chart_top + 36.0f),
@@ -1025,8 +983,7 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         // here both matches the report's denominator and stops one huge bar
         // from flattening every explanatory non-DC mode.
         const double max_magnitude =
-            std::max(*std::max_element(spectrum.begin() + 1, spectrum.end()),
-                     1.0e-12);
+            std::max(*std::max_element(spectrum.begin() + 1, spectrum.end()), 1.0e-12);
         const float bars_top = split_y + type.legend * 1.8f;
         const float bars_bottom = chart_top + chart_h - 11.0f;
         const float bars_h = std::max(1.0f, bars_bottom - bars_top);
@@ -1034,14 +991,13 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         const std::size_t mode_count = spectrum.size() - 1;
         const float slot = bars_w / static_cast<float>(mode_count);
         const std::size_t visible = std::min(
-            mode_count,
-            static_cast<std::size_t>(std::ceil(
-                cue.spectral_spectrum_reveal * static_cast<double>(mode_count))));
+            mode_count, static_cast<std::size_t>(std::ceil(cue.spectral_spectrum_reveal *
+                                                           static_cast<double>(mode_count))));
         const double log_max = std::log1p(max_magnitude);
         for (std::size_t mode = 0; mode < visible; ++mode) {
             const std::size_t i = mode + 1;
-            const float magnitude = static_cast<float>(
-                std::log1p(spectrum[i]) / std::max(log_max, 1.0e-12));
+            const float magnitude =
+                static_cast<float>(std::log1p(spectrum[i]) / std::max(log_max, 1.0e-12));
             const float x0 = origin.x + pad + static_cast<float>(mode) * slot;
             const float x1 = x0 + std::max(1.0f, slot - 1.0f);
             const float y0 = bars_bottom - bars_h * magnitude;
@@ -1050,19 +1006,17 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                 static_cast<float>(1.0 - 0.82 * cue.spectral_filter_mix);
             const ImVec4 color =
                 survives ? palette.accent
-                         : ImVec4(palette.text_dim.x, palette.text_dim.y,
-                                  palette.text_dim.z,
+                         : ImVec4(palette.text_dim.x, palette.text_dim.y, palette.text_dim.z,
                                   palette.text_dim.w * discarded_alpha);
-            dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, bars_bottom),
-                              faded(color, alpha), 1.0f);
+            dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, bars_bottom), faded(color, alpha),
+                              1.0f);
         }
     }
-    const std::array<const char*, 5> steps{
-        "1 sample κ(s)", "2 FFT", "3 rank energy", "4 inverse FFT", "5 map h(x)"};
-    const std::array<double, 5> progress{
-        cue.spectral_edge_reveal, cue.spectral_spectrum_reveal,
-        cue.spectral_filter_mix, cue.spectral_filter_mix,
-        cue.spectral_field_reveal};
+    const std::array<const char*, 5> steps{"1 sample κ(s)", "2 FFT", "3 rank energy",
+                                           "4 inverse FFT", "5 map h(x)"};
+    const std::array<double, 5> progress{cue.spectral_edge_reveal,
+                                         cue.spectral_spectrum_reveal, cue.spectral_filter_mix,
+                                         cue.spectral_filter_mix, cue.spectral_field_reveal};
     const float gap = 6.0f;
     const float box_w = (chart_w - gap * 4.0f) / 5.0f;
     const float box_y = chart_top + chart_h + type.label * 0.85f;
@@ -1074,8 +1028,8 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                                 alpha * (active ? 0.66f : 0.44f)),
                           5.0f);
         dl->AddText(font, type.legend, ImVec2(x + 7.0f, box_y + 7.0f),
-                    faded(active ? palette.text : palette.text_dim, alpha),
-                    steps[i], nullptr, std::max(20.0f, box_w - 14.0f));
+                    faded(active ? palette.text : palette.text_dim, alpha), steps[i], nullptr,
+                    std::max(20.0f, box_w - 14.0f));
     }
     const std::string floor =
         state.sizing.brep_curvature
@@ -1083,23 +1037,24 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
             : (state.skeleton_source == SkeletonSource::kBrepEdges
                    ? (bc_sizing
                           ? "Exact curve measured above · h(x) is driven by supports/load."
-                          : "Exact curve measured above · uniform mesh does not grade from it.")
+                          : "Exact curve measured above · uniform mesh does not grade from "
+                            "it.")
                    : "No exact-BRep curvature report is available for this input.");
-    dl->AddText(font, type.legend, ImVec2(origin.x, box_y + type.label * 2.7f),
-                faded(state.sizing.brep_curvature ? palette.status_ok : palette.status_warn,
-                      alpha),
-                floor.c_str(), nullptr, wrap);
+    dl->AddText(
+        font, type.legend, ImVec2(origin.x, box_y + type.label * 2.7f),
+        faded(state.sizing.brep_curvature ? palette.status_ok : palette.status_warn, alpha),
+        floor.c_str(), nullptr, wrap);
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
 }
 
-void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
-                       const CinemaType& type, const CinemaHud& hud, float alpha) {
+void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue, const CinemaType& type,
+                       const CinemaHud& hud, float alpha) {
     if (alpha <= 0.0f) {
         return;
     }
     const std::size_t n_fill = initial_fill_stage_count(state.stages);
     std::size_t index = cue.stage_index >= 0 ? static_cast<std::size_t>(cue.stage_index)
-                                            : (n_fill > 0 ? n_fill - 1 : 0);
+                                             : (n_fill > 0 ? n_fill - 1 : 0);
     if (n_fill > 0) {
         index = std::min(index, n_fill - 1);
     }
@@ -1127,10 +1082,9 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     const float bar_y = origin.y + type.caption * 3.2f;
     const float bar_h = 18.0f;
     if (emitted != nullptr) {
-        const std::size_t total =
-            std::max<std::size_t>(1, std::accumulate(emitted->type_counts.begin(),
-                                                     emitted->type_counts.end(),
-                                                     std::size_t{0}));
+        const std::size_t total = std::max<std::size_t>(
+            1, std::accumulate(emitted->type_counts.begin(), emitted->type_counts.end(),
+                               std::size_t{0}));
         float x = origin.x;
         for (std::size_t i = 0; i < emitted->type_counts.size(); ++i) {
             if (emitted->type_counts[i] == 0) {
@@ -1139,15 +1093,15 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
             const float w = region.x * static_cast<float>(emitted->type_counts[i]) /
                             static_cast<float>(total);
             const auto rgb = element_type_color(static_cast<fea::ElementType>(i));
-            dl->AddRectFilled(ImVec2(x, bar_y), ImVec2(x + w, bar_y + bar_h),
-                              rgba(rgb, alpha), 2.0f);
+            dl->AddRectFilled(ImVec2(x, bar_y), ImVec2(x + w, bar_y + bar_h), rgba(rgb, alpha),
+                              2.0f);
             x += w;
         }
     }
 
     const float card_top = bar_y + bar_h + type.label * 1.4f;
-    const float card_h = std::max(
-        260.0f, region.y - (card_top - origin.y) - type.label * 6.4f);
+    const float card_h =
+        std::max(260.0f, region.y - (card_top - origin.y) - type.label * 6.4f);
     const float card_gap = 12.0f;
     const float card_w = (region.x - card_gap) * 0.5f;
     const auto draw_tet = [&](float x, bool quadratic) {
@@ -1162,7 +1116,12 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
             {x + card_w * 0.63f, card_top + card_h * 0.53f},
         }};
         constexpr std::array<std::array<std::size_t, 2>, 6> edges{{
-            {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
+            {{0, 1}},
+            {{0, 2}},
+            {{0, 3}},
+            {{1, 2}},
+            {{1, 3}},
+            {{2, 3}},
         }};
         for (const auto& edge : edges) {
             dl->AddLine(p[edge[0]], p[edge[1]], faded(palette.text, 0.72f * alpha), 2.0f);
@@ -1176,9 +1135,8 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
             dl->AddCircleFilled(point, 6.0f, faded(palette.text, alpha));
         }
         const char* title = quadratic ? "order 2 · tet10" : "order 1 · tet4";
-        const char* subline =
-            quadratic ? "six midside nodes bend with the exact CAD"
-                      : "four corners define the linear fill";
+        const char* subline = quadratic ? "six midside nodes bend with the exact CAD"
+                                        : "four corners define the linear fill";
         dl->AddText(font, type.label, ImVec2(x + 12.0f, card_top + 10.0f),
                     faded(quadratic ? palette.accent : palette.text, alpha), title);
         dl->AddText(font, type.legend,
@@ -1191,18 +1149,18 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     const float facts_y = card_top + card_h + type.label * 1.1f;
     std::string quality = "quality summary arrives with the emitted mesh";
     if (solved != nullptr && solved->quality_measured > 0) {
-        quality = fmt("shape quality  min %.4g · mean %.4g · %s cells measured",
-                      solved->quality_min, solved->quality_mean,
-                      grouped(solved->quality_measured).c_str());
+        quality =
+            fmt("shape quality  min %.4g · mean %.4g · %s cells measured", solved->quality_min,
+                solved->quality_mean, grouped(solved->quality_measured).c_str());
     }
-    dl->AddText(font, type.label, ImVec2(origin.x, facts_y),
-                faded(palette.status_ok, alpha), quality.c_str(), nullptr, wrap);
-    const std::string facts = fmt(
-        "spectral sizing %s · exact BRep curvature %s · polynomial order %d · "
-        "ZZ recovery %s",
-        state.sizing.spectral.applied ? "on" : "off",
-        state.sizing.brep_curvature ? "on" : "off", hud.order,
-        state.solve_stages.empty() ? "waiting" : "measured");
+    dl->AddText(font, type.label, ImVec2(origin.x, facts_y), faded(palette.status_ok, alpha),
+                quality.c_str(), nullptr, wrap);
+    const std::string facts =
+        fmt("spectral sizing %s · exact BRep curvature %s · polynomial order %d · "
+            "ZZ recovery %s",
+            state.sizing.spectral.applied ? "on" : "off",
+            state.sizing.brep_curvature ? "on" : "off", hud.order,
+            state.solve_stages.empty() ? "waiting" : "measured");
     dl->AddText(font, type.legend, ImVec2(origin.x, facts_y + type.label * 1.7f),
                 faded(palette.text_dim, alpha), facts.c_str(), nullptr, wrap);
     dl->AddText(font, type.legend, ImVec2(origin.x, facts_y + type.label * 3.1f),
@@ -1229,15 +1187,15 @@ void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaTyp
         feature_alpha = cue.panel_open;
     } else if (cue.act == CinemaAct::kDeliberate) {
         const double bridge = std::min(1.3, 0.18 * cue.act_span);
-        const float blend = static_cast<float>(
-            smoothstep(cue.act_t / std::max(bridge, 1.0e-9)));
+        const float blend =
+            static_cast<float>(smoothstep(cue.act_t / std::max(bridge, 1.0e-9)));
         feature_alpha = 1.0f - blend;
         network_alpha = blend;
     } else if (cue.act == CinemaAct::kBuild) {
         network_alpha = 1.0f;
     } else if (cue.act == CinemaAct::kMeshHold) {
-        const float blend = static_cast<float>(
-            smoothstep(cue.act_t / std::max(0.9, 0.17 * cue.act_span)));
+        const float blend =
+            static_cast<float>(smoothstep(cue.act_t / std::max(0.9, 0.17 * cue.act_span)));
         network_alpha = 1.0f - blend;
         cell_alpha = blend;
     } else {

@@ -413,7 +413,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
     for (int pass = 0; pass < passes; ++pass) {
         fill_progress_phase("projection_pass", pass + 1, passes);
         for (std::size_t work_done = 0; auto ni : boundary_nodes) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, boundary_nodes.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, boundary_nodes.size());
             if (ni >= nodes.size()) {
                 continue;
             }
@@ -727,7 +728,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                                  return ka != kb ? ka < kb : a.node < b.node;
                              });
             for (std::size_t work_done = 0; const auto& r : recover) {
-                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, recover.size());
+                if (active_fill_progress != nullptr)
+                    fill_progress_poll(work_done++, recover.size());
                 if (node_offends(r.node)) {
                     nodes[r.node] = r.original;
                     continue;
@@ -850,7 +852,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
 
     stats.max_residual = 0.0;
     for (std::size_t work_done = 0; auto ni : boundary_nodes) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, boundary_nodes.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, boundary_nodes.size());
         if (ni >= nodes.size()) {
             continue;
         }
@@ -1024,7 +1027,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     }
     const bool exact_owners = projection != nullptr && projection->target;
     for (std::size_t work_done = 0; const auto ni : nbr_ids) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, nbr_ids.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, nbr_ids.size());
         Kind k = Kind::kFree;
         if (exact_owners) {
             // Classification is a side effect of the first exact target query;
@@ -1087,7 +1091,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> targets;
         targets.reserve(nbr.size());
         for (std::size_t work_done = 0; const auto ni : nbr_ids) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, nbr_ids.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, nbr_ids.size());
             const auto& nb = nbr.at(ni);
             const Kind k = kind[ni];
             if (k == Kind::kFrozen || nb.empty()) {
@@ -1191,7 +1196,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
             break;
         }
         for (std::size_t work_done = 0; const auto& [ni, p] : targets) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, targets.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, targets.size());
             moved.try_emplace(ni, nodes[ni]);
             nodes[ni] = p;
         }
@@ -1225,7 +1231,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     }
     stats.n_moved = moved.size();
     for (std::size_t work_done = 0; const auto& [ni, _] : nbr) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, nbr.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, nbr.size());
         stats.max_residual =
             std::max(stats.max_residual, closest_on_surface(surface, nodes[ni]).distance);
     }

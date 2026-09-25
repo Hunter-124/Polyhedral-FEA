@@ -8,7 +8,8 @@ namespace polymesh::fea::detail {
 /// Strain-displacement matrix B (6 x 3n) in Voigt order
 /// (xx, yy, zz, yz, xz, xy) with engineering shear strains, from physical
 /// shape-function gradients (n x 3).
-inline Eigen::MatrixXd strain_displacement(const Eigen::Matrix<double, Eigen::Dynamic, 3>& dndx) {
+inline Eigen::MatrixXd
+strain_displacement(const Eigen::Matrix<double, Eigen::Dynamic, 3>& dndx) {
     const Eigen::Index n = dndx.rows();
     Eigen::MatrixXd b = Eigen::MatrixXd::Zero(6, 3 * n);
     for (Eigen::Index a = 0; a < n; ++a) {

@@ -413,8 +413,7 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
                 build_cinema_skeleton(app.cinema, *app.model, app.setup, app.viewport);
                 const ImGuiViewport* main_vp = ImGui::GetMainViewport();
                 const CinemaLayout layout = cinema_layout(app, *main_vp);
-                app.viewport.frame_content(DisplayMode::kCinema,
-                                           layout.settled_view_aspect);
+                app.viewport.frame_content(DisplayMode::kCinema, layout.settled_view_aspect);
             }
         } else if (args.size() == 1 && args[0] == "off") {
             if (worker_busy) {
@@ -470,8 +469,7 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
                                                   static_cast<float>(app.deform_scale));
             const ImGuiViewport* main_vp = ImGui::GetMainViewport();
             const CinemaLayout layout = cinema_layout(app, *main_vp);
-            app.viewport.frame_content(DisplayMode::kCinema,
-                                       layout.settled_view_aspect);
+            app.viewport.frame_content(DisplayMode::kCinema, layout.settled_view_aspect);
         }
         app.cinema.record_dir = args[0];
         app.cinema.record_frames = frames;
@@ -583,9 +581,9 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
     double opening_t1 = 0.0;
     cinema_act_window(cine, CinemaAct::kSkeleton, opening_t0, opening_t1);
     const double poster_t = opening_t0 + 0.22 * (opening_t1 - opening_t0);
-    const int poster = std::min(
-        cine.record_frames - 1,
-        static_cast<int>(std::ceil(poster_t / CinemaState::kRecordStep)));
+    const int poster =
+        std::min(cine.record_frames - 1,
+                 static_cast<int>(std::ceil(poster_t / CinemaState::kRecordStep)));
     // The numeric tail is the manifest's compact verification record. Nodes,
     // total DOF and quality all come from the final authoritative solve stage;
     // absent data stays zero rather than being reconstructed by the script.
@@ -603,17 +601,17 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
     }
     for (std::size_t i = 0; i < cine.stages.size(); ++i) {
         const auto& stage = cine.stages[i];
-        std::printf("cinema: mesh_stage index %zu pass %d id %s elements %zu nodes %zu\n",
-                    i, stage.pass, stage.stage.c_str(), stage.mesh.elements.size(),
+        std::printf("cinema: mesh_stage index %zu pass %d id %s elements %zu nodes %zu\n", i,
+                    stage.pass, stage.stage.c_str(), stage.mesh.elements.size(),
                     stage.mesh.nodes.size());
     }
     for (std::size_t i = 0; i < cine.solve_stages.size(); ++i) {
         const auto& stage = cine.solve_stages[i];
         std::printf("cinema: solve_stage index %zu pass %d elements %zu nodes %zu dof %zu "
                     "global_eta %.9g h_mark %zu p_mark %zu shape_mark %zu\n",
-                    i, stage.pass, stage.trace.n_elems, stage.trace.n_nodes,
-                    stage.trace.n_dof, stage.trace.global_eta, stage.trace.n_h_mark,
-                    stage.trace.n_p_mark, stage.trace.n_shape_mark);
+                    i, stage.pass, stage.trace.n_elems, stage.trace.n_nodes, stage.trace.n_dof,
+                    stage.trace.global_eta, stage.trace.n_h_mark, stage.trace.n_p_mark,
+                    stage.trace.n_shape_mark);
     }
     const double stress_p99 =
         !cine.stress_histograms.empty() ? cine.stress_histograms.back().p99 : 0.0;
@@ -638,9 +636,8 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
         cine.record_dir.c_str(), cine.record_frames, candidates, cine.stages.size(),
         app.viewport.cinema_element_count(), nodes, dof, quality_min, quality_mean,
         app.setup.youngs_modulus, app.setup.poissons_ratio, max_von_mises, stress_p99,
-        global_eta, error_p99, max_displacement, app.deform_scale,
-        visible_displacement, visible_fraction,
-        app.viewport.cinema_unchanged_element_count(),
+        global_eta, error_p99, max_displacement, app.deform_scale, visible_displacement,
+        visible_fraction, app.viewport.cinema_unchanged_element_count(),
         app.viewport.cinema_removed_element_count(), app.viewport.cinema_added_element_count(),
         poster, fb_w, fb_h, app.viewport.cinema_skipped_element_count(),
         cine.solve_stages.size(), cinema_solver_token(cine));

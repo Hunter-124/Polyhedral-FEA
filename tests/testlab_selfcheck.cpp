@@ -182,17 +182,7 @@ TEST_CASE("testlab: parse solve_suspect + null scorecard fields") {
     CHECK_THAT(row.answers.strain_energy, Catch::Matchers::WithinAbs(0.009, 1e-12));
 }
 
-TEST_CASE("testlab: parse handoff.json open_program_nodes") {
-    const auto h = polymesh::gui::testlab::parse_handoff(R"({
-  "campaign": "varyhedron-baseline-m9",
-  "git_head": "abc123",
-  "mode": "autonomous",
-  "open_program_nodes": ["V10c", "M12", "G0"]
-})");
-    CHECK(h.campaign == "varyhedron-baseline-m9");
-    CHECK(h.mode == "autonomous");
-    REQUIRE(h.open_program_nodes.size() == 3);
-    CHECK(h.open_program_nodes[0] == "V10c");
+TEST_CASE("testlab: measure-first baseline name") {
     CHECK(polymesh::gui::testlab::is_measure_first_baseline("varyhedron-baseline-m9"));
     CHECK_FALSE(polymesh::gui::testlab::is_measure_first_baseline("varyhedron-short-1"));
 }

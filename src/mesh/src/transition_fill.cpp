@@ -41,11 +41,9 @@ constexpr std::array<std::array<int, 3>, 6> kFaceNbr{{
 /// non-positive signed measure), or — when `shape_floor > 0` — a sliver below
 /// that normalized shape floor.
 ///
-/// The pyramid branch used to read `std::abs(v1) <= eps || std::abs(v2) <= eps`
-/// on the grounds that "assembly may flip orientation": it does (assembly.cpp
-/// re-orients each negative half), but that only hides the inversion from the
-/// solver — the cell still ships inverted to the VTU and to every consumer that
-/// trusts the winding. The test is signed now.
+/// The pyramid test is signed: assembly re-orients a negative split half, but
+/// that only hides the inversion from the solver — the cell would still ship
+/// inverted to the VTU and to every consumer that trusts the winding.
 bool cell_inverted(const TransitionCell& cell, const std::vector<Eigen::Vector3d>& nodes,
                    double vol_eps, double shape_floor) {
     if (cell.kind == TransitionCellKind::kHex8) {
@@ -201,8 +199,8 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
         throw ValidityError("transition_fill_surface: no interior cells");
     }
 
-    // Multi-pass surface snap on free-boundary lattice nodes (not pyramid apices).
-    // Jacobian safety (B3): unsnap any moved node that inverts a hex or pyramid.
+    // Multi-pass surface snap on free-boundary lattice nodes (not pyramid apices),
+    // gated on cell validity and the shared shape floor.
     if (snap_boundary && !out.boundary_quads.empty()) {
         std::set<std::uint32_t> bnode_set;
         for (const auto& q : out.boundary_quads) {

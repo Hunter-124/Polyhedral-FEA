@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/vem.hpp"
 
+#include "strain_displacement.hpp"
+
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
 
@@ -8,6 +10,7 @@
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 #include <map>
@@ -44,14 +47,9 @@ Eigen::Vector3d face_normal_area(const std::vector<Eigen::Vector3d>& coords,
 /// integral is exact for affine `u`:
 ///     ∫_F u = Σ_i A_i (u(p) + u_i + u_{i+1}) / 3,   u(p) = Σ_j u_j / n
 ///   ⇒ w_j = 1/(3n) + (A_{j-1} + A_j) / (3 Σ A).
-/// The uniform `1/n` this replaced is exact only when the vertex centroid
-/// already *is* the area centroid — true for triangles and rectangles (so
-/// structured-grid stiffness is unchanged bit-for-bit), false the moment a face
-/// carries a hanging mid-edge vertex. A 2:1 transition polyhedron (ADR-0019)
-/// has exactly such faces: a square face with one edge mid has vertex centroid
-/// (0.5, 0.4)·s against area centroid (0.5, 0.5)·s, so the k=1 consistency term
-/// lost linear exactness and the FE/VEM constant-strain patch read ~1.7e-5
-/// instead of machine zero (measured 2026-08-08).
+/// Uniform `1/n` is exact only when the vertex centroid is the area centroid
+/// (triangles, rectangles); faces carrying hanging mid-edge vertices (2:1
+/// transition polyhedra, ADR-0019) need these weights for k=1 linear exactness.
 void face_vertex_weights(const std::vector<Eigen::Vector3d>& coords,
                          const std::vector<std::uint32_t>& face,
                          const Eigen::Vector3d& unit_normal, std::vector<double>& w_out) {
@@ -82,22 +80,44 @@ void face_vertex_weights(const std::vector<Eigen::Vector3d>& coords,
     }
 }
 
-Eigen::MatrixXd b_from_grads(const Eigen::Matrix<double, Eigen::Dynamic, 3>& dndx) {
-    const Eigen::Index n = dndx.rows();
-    Eigen::MatrixXd b = Eigen::MatrixXd::Zero(6, 3 * n);
-    for (Eigen::Index a = 0; a < n; ++a) {
-        const double dx = dndx(a, 0), dy = dndx(a, 1), dz = dndx(a, 2);
-        b(0, 3 * a + 0) = dx;
-        b(1, 3 * a + 1) = dy;
-        b(2, 3 * a + 2) = dz;
-        b(3, 3 * a + 1) = dz;
-        b(3, 3 * a + 2) = dy;
-        b(4, 3 * a + 0) = dz;
-        b(4, 3 * a + 2) = dx;
-        b(5, 3 * a + 0) = dy;
-        b(5, 3 * a + 1) = dx;
+/// Unique undirected edges from face loops, deterministic order (first-seen
+/// while walking faces in order, each face edge in loop order). Endpoints are
+/// local vertex indices. This order defines the k=2 mid-edge node layout.
+std::vector<std::array<std::uint32_t, 2>>
+poly_edges(const std::vector<std::vector<std::uint32_t>>& faces) {
+    std::vector<std::array<std::uint32_t, 2>> edges;
+    std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
+    for (const auto& face : faces) {
+        const auto m = face.size();
+        if (m < 2) {
+            continue;
+        }
+        for (std::size_t i = 0; i < m; ++i) {
+            const auto a = face[i];
+            const auto b = face[(i + 1) % m];
+            const auto key = std::minmax(a, b);
+            if (seen.insert(key).second) {
+                edges.push_back({key.first, key.second});
+            }
+        }
     }
-    return b;
+    return edges;
+}
+
+/// Number of distinct local vertex indices referenced by faces (expects 0..nv-1).
+std::size_t poly_vertex_count(const std::vector<std::vector<std::uint32_t>>& faces) {
+    std::uint32_t max_i = 0;
+    bool any = false;
+    for (const auto& face : faces) {
+        for (auto i : face) {
+            max_i = std::max(max_i, i);
+            any = true;
+        }
+    }
+    if (!any) {
+        return 0;
+    }
+    return static_cast<std::size_t>(max_i) + 1;
 }
 
 /// Columns = DOF vectors of the 12-dim linear space (RBM + constant strain)
@@ -248,11 +268,8 @@ template <typename Fun> Eigen::MatrixXd integrate_p2_matrix(const TetFan& fan, F
     Eigen::MatrixXd acc = Eigen::MatrixXd::Zero(kP2Vec, kP2Vec);
     const auto rule = tet_rule(4);
     for (const auto& tet : fan.tets) {
-        // Reference tet: L0+L1+L2+L3=1, Li>=0. Map xi (bary of first 3) → physical.
-        // Our tet_rule uses {xi,eta,zeta >= 0, sum <= 1} with vertices
-        // (0,0,0),(1,0,0),(0,1,0),(0,0,1) ↔ physical (v0,v1,v2,v3)?
-        // Standard: x = v0 + xi*(v1-v0) + eta*(v2-v0) + zeta*(v3-v0),
-        // but ref volume 1/6 matches tet (0,e1,e2,e3). Here v0=centroid.
+        // Affine map from the tet_rule reference tet (0, e1, e2, e3):
+        // x = v0 + xi*(v1-v0) + eta*(v2-v0) + zeta*(v3-v0), with v0 = centroid.
         const Eigen::Vector3d& v0 = tet[0];
         const Eigen::Vector3d e1 = tet[1] - v0;
         const Eigen::Vector3d e2 = tet[2] - v0;
@@ -263,8 +280,8 @@ template <typename Fun> Eigen::MatrixXd integrate_p2_matrix(const TetFan& fan, F
         }
         for (const auto& qp : rule) {
             const Eigen::Vector3d x = v0 + qp.xi[0] * e1 + qp.xi[1] * e2 + qp.xi[2] * e3;
-            // dV = det * w_ref, w_ref already integrates over ref volume 1/6,
-            // so physical weight = det * qp.weight (det = 6 V ⇒ V * 6w).
+            // tet_rule weights integrate the reference volume 1/6 and
+            // det = 6 V, so the physical weight is det * qp.weight.
             const Eigen::MatrixXd dens = density(x);
             acc.noalias() += dens * (det * qp.weight);
         }
@@ -328,10 +345,8 @@ P2Projector make_p2_projector(const std::vector<Eigen::Vector3d>& coords,
 /// tr(stab) counts exactly the DOFs the consistency term leaves unstiffened and
 /// α is the average stiffness handed to each of them. Scaling α off tr(K_c)
 /// makes the weight automatically correct in cell size, material and cell
-/// aspect — the previous `τ μ h` form used h = √(A/6V), which carries units of
-/// length^(−1/2): it happened to be right only on a unit-sized cell and grew as
-/// h⁻¹ᐟ² on every real mesh (0.02 m cells were stabilised ~350× too hard, which
-/// is the hexvem over-stiffness reported in the M-audit).
+/// aspect; a `τ μ h` form is dimensionally inconsistent and over-stiffens
+/// small cells.
 ///
 /// `kStabTraceRatio` = 7/9 is not a tuning knob: for any rectangular hex brick
 /// the VEM k=1 consistency term is exactly the one-point-quadrature hex8, and
@@ -378,7 +393,7 @@ Eigen::MatrixXd vem_stiffness_k1(const std::vector<Eigen::Vector3d>& coords,
         }
     }
     grad /= vol;
-    const auto b = b_from_grads(grad);
+    const auto b = detail::strain_displacement(grad);
     const auto d = material.d_matrix();
     Eigen::MatrixXd k = vol * (b.transpose() * d * b);
 
@@ -472,7 +487,7 @@ Eigen::MatrixXd hex20_stiffness(const std::vector<Eigen::Vector3d>& coords20,
         }
         const Eigen::Matrix3d jac_inv = jac.inverse();
         const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = shape.dn * jac_inv.transpose();
-        const auto b = b_from_grads(dndx);
+        const auto b = detail::strain_displacement(dndx);
         k.noalias() += b.transpose() * d * b * (det * qp.weight);
     }
     k = 0.5 * (k + k.transpose()).eval();
@@ -532,8 +547,8 @@ Eigen::MatrixXd vem_stiffness_k2(const std::vector<Eigen::Vector3d>& coords,
         throw FeaError(std::format("vem_poly_stiffness: non-positive volume {:.3e}", vol));
     }
 
-    // Hex serendipity path (ROADMAP C4 / ADR-0017): coincides with isoparametric
-    // hex20 so multi-element assembly, patch test, and MMS order-2 hold.
+    // Hex serendipity path (ADR-0017): coincides with isoparametric hex20 so
+    // multi-element assembly, patch test, and MMS order-2 hold.
     if (is_hex_serendipity_cell(coords, faces)) {
         const auto c20 = hex20_coords_canonical(coords, faces);
         const auto k20 = hex20_stiffness(c20, material);
@@ -561,9 +576,8 @@ Eigen::MatrixXd vem_stiffness_k2(const std::vector<Eigen::Vector3d>& coords,
     const Eigen::MatrixXd nod_proj = proj.dof_eval * proj.pi;
     const Eigen::MatrixXd i_minus = Eigen::MatrixXd::Identity(ndof, ndof) - nod_proj;
     const Eigen::MatrixXd stab = i_minus.transpose() * i_minus;
-    // Same trace scaling as k=1: `τ μ h` with h = √(A/6V) is dimensionally wrong
-    // and blows up as the cell shrinks. The hex-serendipity path above is exact,
-    // so this branch only ever sees general polyhedra.
+    // Same trace scaling as k=1 (see stab_weight). The hex-serendipity path
+    // above is exact, so this branch only ever sees general polyhedra.
     const double alpha = stab_weight(k, stab);
     k.noalias() += alpha * stab;
 
@@ -572,42 +586,6 @@ Eigen::MatrixXd vem_stiffness_k2(const std::vector<Eigen::Vector3d>& coords,
 }
 
 } // namespace
-
-std::vector<std::array<std::uint32_t, 2>>
-poly_edges(const std::vector<std::vector<std::uint32_t>>& faces) {
-    std::vector<std::array<std::uint32_t, 2>> edges;
-    std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
-    for (const auto& face : faces) {
-        const auto m = face.size();
-        if (m < 2) {
-            continue;
-        }
-        for (std::size_t i = 0; i < m; ++i) {
-            const auto a = face[i];
-            const auto b = face[(i + 1) % m];
-            const auto key = std::minmax(a, b);
-            if (seen.insert(key).second) {
-                edges.push_back({key.first, key.second});
-            }
-        }
-    }
-    return edges;
-}
-
-std::size_t poly_vertex_count(const std::vector<std::vector<std::uint32_t>>& faces) {
-    std::uint32_t max_i = 0;
-    bool any = false;
-    for (const auto& face : faces) {
-        for (auto i : face) {
-            max_i = std::max(max_i, i);
-            any = true;
-        }
-    }
-    if (!any) {
-        return 0;
-    }
-    return static_cast<std::size_t>(max_i) + 1;
-}
 
 int vem_infer_order(std::size_t num_nodes,
                     const std::vector<std::vector<std::uint32_t>>& faces) {
@@ -645,9 +623,8 @@ double poly_volume(const std::vector<Eigen::Vector3d>& coords,
 
 Eigen::Vector3d poly_centroid(const std::vector<Eigen::Vector3d>& coords,
                               const std::vector<std::vector<std::uint32_t>>& faces) {
-    // Volume-weighted centroid via divergence: for each tet of the fan from
-    // an arbitrary origin, accumulate first moments. Use vertex mean as a
-    // stable interior point for the fan.
+    // Volume-weighted centroid: accumulate first moments of the signed tet fan
+    // from the vertex mean (a stable interior point) to each triangulated face.
     const auto nv = poly_vertex_count(faces);
     if (nv == 0) {
         return Eigen::Vector3d::Zero();
@@ -735,18 +712,13 @@ PolyCell hex20_as_poly(const NodalElement& hex20) {
     if (hex20.nodes.size() != 20) {
         throw FeaError("hex20_as_poly: expected 20 nodes");
     }
-    // Keep canonical hex20 node order (verts 0..7, mids 8..19 per nodal_mesh.hpp).
-    // Stiffness maps this to poly_edges mid order only if needed; hex serendipity
-    // path consumes hex20 order directly via reordering helpers.
+    // Nodes: the 8 vertices, then the canonical hex20 mids (nodal_mesh.hpp
+    // edge order) reordered into poly_edges order, so vem_infer_order and the
+    // k=2 paths see the PolyCell layout.
     PolyCell c;
-    c.nodes = hex20.nodes;
     c.faces = hex8_as_poly(NodalElement{ElementType::kHex8,
                                         {hex20.nodes.begin(), hex20.nodes.begin() + 8}})
                   .faces;
-    // Append nothing — mids already present. Verify they match poly_edges geometry:
-    // nodes must be (8 verts) + (12 mids). poly_edges order may differ from hex20;
-    // vem_stiffness_k2 reorders via endpoint pairs.
-    // Rebuild as verts + poly_edges-ordered mids so infer_order and general path agree.
     std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t> mid_of;
     for (std::size_t e = 0; e < kHex20Edges.size(); ++e) {
         const auto a = static_cast<std::uint32_t>(kHex20Edges[e][0]);
@@ -876,7 +848,7 @@ double vem_energy_error_sq(
             }
         }
         grad /= vol;
-        const auto b = b_from_grads(grad);
+        const auto b = detail::strain_displacement(grad);
         const Eigen::Matrix<double, 6, 1> eps_h = b * u_elem;
         const Eigen::Vector3d c = poly_centroid(coords, faces);
         const Eigen::Matrix<double, 6, 1> diff = eps_h - exact_strain(c);
@@ -979,7 +951,7 @@ vem_projected_strain(const std::vector<Eigen::Vector3d>& coords,
             }
         }
         grad /= vol;
-        const auto b = b_from_grads(grad);
+        const auto b = detail::strain_displacement(grad);
         return b * u_elem;
     }
     if (order != 2) {

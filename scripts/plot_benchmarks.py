@@ -8,7 +8,7 @@ by hand and nothing is estimated:
   bench_tier1.png     <- bench/results/polymesh-gate1-p1.json
                          + bench/reports/p1-gate1-convergence.md (tolerances)
   bench_mms.png       <- bench/reports/p1-gate1-convergence.md (Tier-2 table)
-                         + docs/progress.md (hierarchical p=1..4 rates)
+                         + docs/archive/progress-history.md (hierarchical p=1..4 rates)
 
 Honesty rules baked into the titles/subtitles (non-negotiable, from the ADRs):
   * Speedup is against PolyMesh's OWN frozen uniform tet10 baseline. It is
@@ -36,7 +36,7 @@ REPO = Path(__file__).resolve().parent.parent
 D6_JSON = REPO / "bench/results/polymesh-d6-l-domain.json"
 GATE1_JSON = REPO / "bench/results/polymesh-gate1-p1.json"
 GATE1_MD = REPO / "bench/reports/p1-gate1-convergence.md"
-PROGRESS_MD = REPO / "docs/progress.md"
+PROGRESS_MD = REPO / "docs/archive/progress-history.md"
 ADVISOR_SWEEP_JSON = REPO / "bench/results/advisor-budget-sweep.json"
 
 
@@ -176,7 +176,7 @@ def parse_mms_elements() -> list[dict]:
 
 
 def parse_mms_hierarchical() -> list[dict]:
-    """Hierarchical p-basis MMS energy rates from docs/progress.md."""
+    """Hierarchical p-basis MMS energy rates from docs/archive/progress-history.md."""
     text = PROGRESS_MD.read_text()
     m = re.search(r"MMS energy rates p=1\.\.(\d+):\s*\*\*([^*]+)\*\*", text)
     if not m:
@@ -275,7 +275,7 @@ def plot_dof_time(outdir: Path) -> Path:
     base_st = fs.series("baseline", "same cell size everywhere (frozen baseline)")
     grad_st = fs.series("graded_tet", "smaller cells toward the sharp inside corner")
     note = repeat_note(raw)
-    # The ratios are now the headline stat on each row, so the prose carries
+    # The ratios are the headline stat on each row, so the prose carries
     # what the marks cannot: what is held fixed, whose baseline this is, and
     # how the timings were sampled.
     subtitle = (
@@ -407,8 +407,8 @@ def plot_tier1(outdir: Path) -> Path:
     else:
         verdict = f"all {n} cases inside the error allowed"
     title = f"Tier-1 checks against exact textbook answers \u2014 {verdict}"
-    # The mesh kind of every case is now drawn on its own row, so the prose
-    # keeps the fact without re-listing them.
+    # The mesh kind of every case is drawn on its own row, so the prose keeps
+    # the fact without re-listing them.
     subtitle = (
         "Each bar is one case: the filled part is the error PolyMesh made and "
         "the whole track is the error allowed for that case. Measured on "

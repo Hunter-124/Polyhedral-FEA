@@ -7,6 +7,7 @@
 #include <limits>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 namespace polymesh::adapt {
 namespace {
@@ -307,7 +308,7 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
 
     double h_ref = h_uniform;
     if (!(h_ref > 0.0)) {
-        // Median-ish of provided h values.
+        // Mean of the provided h values.
         double sum = 0.0;
         for (const auto& s : signals) {
             sum += s.h;
@@ -374,8 +375,8 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
         }
     }
 
-    // Optional: shrink h_mark with Dörfler on h-candidates so the seed set stays
-    // focused when many mild geometry marks fire.
+    // Shrink h_mark with Dörfler on h-candidates so the seed set stays focused
+    // when many mild geometry marks fire.
     if (plan.h_mark.size() > 1) {
         const auto focused = dorfler_mark(h_eta, policy.dorfler_theta);
         if (!focused.empty()) {
@@ -387,7 +388,7 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
                     filtered.push_back(i);
                 }
             }
-            // Keep at least the original strongest if filter emptied somehow.
+            // An empty filter result keeps the unfiltered h_mark.
             if (!filtered.empty()) {
                 plan.h_mark = std::move(filtered);
                 plan.n_h = plan.h_mark.size();
@@ -455,7 +456,7 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
     }
     plan.h_suggestion = std::move(sug);
 
-    // Predicted relative DOF cost of applying the plan (rough v1).
+    // Predicted relative DOF cost of applying the plan (heuristic).
     const double frac_h =
         n > 0 ? static_cast<double>(plan.h_mark.size()) / static_cast<double>(n) : 0.0;
     const double frac_p =
@@ -477,8 +478,6 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
         }
     }
     plan.predicted_dof_factor *= coarsen_dof;
-
-    (void)policy.seed; // reserved for campaign-noise experiments
     return plan;
 }
 

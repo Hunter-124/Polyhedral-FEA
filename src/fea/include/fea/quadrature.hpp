@@ -33,7 +33,7 @@ std::vector<QuadraturePoint> hex_rule(int points_per_axis);
 
 /// Default stiffness-integration rule for an element type. Assumes
 /// straight-edged elements (mid-side nodes at edge midpoints); curved
-/// elements will need higher-degree rules when P3 introduces them.
+/// elements may need higher-degree rules.
 std::vector<QuadraturePoint> default_rule(ElementType type);
 
 } // namespace polymesh::fea

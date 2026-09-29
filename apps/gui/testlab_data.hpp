@@ -138,16 +138,6 @@ struct ResultRow {
     std::string config_summary; // short display of config object
 };
 
-/// Machine handoff pack (interfaces.md §8a) when present under the campaign dir.
-struct HandoffInfo {
-    std::string campaign;
-    std::string git_head;
-    std::string finished_utc;
-    std::string mode; // autonomous | supervised
-    std::vector<std::string> open_program_nodes;
-    std::string checkpoint_state;
-};
-
 struct LiveProgress {
     std::string phase; // mesh | assemble | solve | recover | done
     double phase_frac = 0.0;
@@ -185,8 +175,6 @@ std::optional<CampaignSpec> load_campaign(const std::filesystem::path& dir);
 std::optional<Checkpoint> load_checkpoint(const std::filesystem::path& dir);
 std::vector<ResultRow> load_results(const std::filesystem::path& dir);
 std::optional<LiveProgress> load_progress(const std::filesystem::path& dir);
-std::optional<HandoffInfo> load_handoff(const std::filesystem::path& dir);
-HandoffInfo parse_handoff(const std::string& json_text);
 
 /// True when a campaign name looks like the measure-first M9 freeze baseline.
 bool is_measure_first_baseline(const std::string& campaign_name);

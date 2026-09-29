@@ -1,0 +1,95 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "desktop-base",
+      "hidden": true,
+      "description": "Ninja; the flag set build.sh/build.bat always passed (all equal to the option defaults)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "POLYMESH_WITH_GUI": "ON",
+        "POLYMESH_WITH_OCC": "ON",
+        "POLYMESH_WITH_CUDA": "OFF",
+        "POLYMESH_WITH_OPENMP": "ON",
+        "POLYMESH_NATIVE_ARCH": "OFF",
+        "POLYMESH_ENABLE_LTO": "OFF"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (Ninja)",
+      "description": "CLI + GUI + tests, -O3; binaries under build/",
+      "inherits": "desktop-base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (Ninja)",
+      "description": "CLI + GUI + tests, unoptimised; binaries under build-debug/",
+      "inherits": "desktop-base",
+      "binaryDir": "${sourceDir}/build-debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "no-gui",
+      "displayName": "Release, no GUI (Ninja)",
+      "description": "Libraries + CLI + tests only; binaries under build-no-gui/",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build-no-gui",
+      "cacheVariables": { "POLYMESH_WITH_GUI": "OFF" }
+    },
+    {
+      "name": "relwithdebinfo-ci",
+      "displayName": "CI (RelWithDebInfo, Ninja)",
+      "description": "Exactly the flags of the CI build-test job; binaries under build/",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "POLYMESH_WITH_GUI": "ON",
+        "POLYMESH_WITH_OCC": "ON",
+        "POLYMESH_WITH_CUDA": "OFF"
+      }
+    },
+    {
+      "name": "windows-msvc",
+      "displayName": "Windows MSVC Release (Ninja + vcpkg)",
+      "description": "Run from an MSVC x64 environment; VCPKG_ROOT must name a classic-mode vcpkg with eigen3, nlohmann-json, glad (and opencascade for OCC)",
+      "inherits": "release",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": { "VCPKG_TARGET_TRIPLET": "x64-windows" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "windows-msvc-debug",
+      "displayName": "Windows MSVC Debug (Ninja + vcpkg)",
+      "inherits": "windows-msvc",
+      "binaryDir": "${sourceDir}/build-debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release" },
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "no-gui", "configurePreset": "no-gui" },
+    { "name": "relwithdebinfo-ci", "configurePreset": "relwithdebinfo-ci" },
+    { "name": "windows-msvc", "configurePreset": "windows-msvc", "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "windows-msvc-debug", "configurePreset": "windows-msvc-debug", "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } }
+  ],
+  "testPresets": [
+    {
+      "name": "test-base",
+      "hidden": true,
+      "description": "Discovered tests carry their own working directory (repo root) via catch_discover_tests",
+      "output": { "outputOnFailure": true }
+    },
+    { "name": "release", "inherits": "test-base", "configurePreset": "release" },
+    { "name": "debug", "inherits": "test-base", "configurePreset": "debug" },
+    { "name": "no-gui", "inherits": "test-base", "configurePreset": "no-gui" },
+    { "name": "relwithdebinfo-ci", "inherits": "test-base", "configurePreset": "relwithdebinfo-ci" },
+    { "name": "windows-msvc", "inherits": "test-base", "configurePreset": "windows-msvc", "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "windows-msvc-debug", "inherits": "test-base", "configurePreset": "windows-msvc-debug", "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } }
+  ]
+}

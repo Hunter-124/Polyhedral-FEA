@@ -210,15 +210,13 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
                          boundary_edges.size() / stride + 3);
     node_to_brep.reserve(boundary_nodes.size() / stride + 1);
 
-    // POLYMESH_FIDELITY_DUMP=<path>: write the 64 worst mesh->BRep samples as
-    // "kind distance_m x y z" lines so a tail regression can be located on the
-    // part instead of inferred from quantiles. Diagnostic only; unset = off.
     struct WorstSample {
         double distance;
         char kind;
         Eigen::Vector3d point;
     };
     std::vector<WorstSample> worst_samples;
+    // Debug switch (ADR-0039): dump the 64 worst mesh->BRep samples to this path; unset = off.
     const char* const dump_path = std::getenv("POLYMESH_FIDELITY_DUMP");
     const auto note_sample = [&](double distance, char kind, const Eigen::Vector3d& p) {
         if (dump_path != nullptr) {
@@ -492,16 +490,10 @@ mesh_dihedral_feature_segments(const std::vector<Eigen::Vector3d>& nodes,
         if (normals.size() != 2) {
             continue;
         }
-        // Angle between the two facet PLANES, which is what a crease is. The
-        // signed dot product measured the angle between two winding-dependent
-        // normals instead, so a pair of neighbouring faces that the boundary
-        // extraction happened to wind oppositely read as a 180° crease. That
-        // over-detection is the whole of the "spurious mesh creases" ADR-0035
-        // §5(b) recorded as an open mesher defect: on icecream_cone/graded it
-        // reported 177 feature segments where the geometry has 47, and the
-        // phantom ones are scattered over smooth walls, which is why their
-        // distance to the nearest sharp BRep edge came out at 0.81 of the
-        // bounding-box diagonal.
+        // Angle between the two facet PLANES, which is what a crease is. A signed
+        // dot product would measure the angle between two winding-dependent
+        // normals, so neighbouring faces wound oppositely by the boundary
+        // extraction would read as a 180° crease (phantom creases, ADR-0035 §5(b)).
         const double cosine = std::clamp(std::abs(normals[0].dot(normals[1])), 0.0, 1.0);
         if (std::acos(cosine) < threshold) {
             continue;

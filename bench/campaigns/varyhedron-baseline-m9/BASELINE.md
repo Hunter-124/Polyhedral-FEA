@@ -22,7 +22,6 @@ claim a “win” against pre-M6–M8 short campaigns alone.
 | **Campaign** | `bench/campaigns/varyhedron-baseline-m9/` |
 | **Results** | [`results.jsonl`](results.jsonl) (8 lines) |
 | **PARETO** | [`PARETO.md`](PARETO.md) / [`PARETO.json`](PARETO.json) |
-| **HANDOFF** | [`HANDOFF.md`](HANDOFF.md) / [`handoff.json`](handoff.json) |
 | **Warehouse** | `runs/<cfg>/<part>/t0/{mesh.vtu,wire.png,quality.json,result.json}` |
 
 ### Why 8 runs (not short-1’s 24)
@@ -42,7 +41,7 @@ overnight pack:
 
 **Label:** `scorecard-m1-m8-v1` (post M6–M8, 2026-07-12/13)
 
-Normative defs: [`docs/research/campaign-metrics.md`](../../../docs/research/campaign-metrics.md),
+Normative defs: [`docs/archive/research/campaign-metrics.md`](../../../docs/archive/research/campaign-metrics.md),
 [`docs/dag/interfaces.md`](../../../docs/dag/interfaces.md), ADR-0024.
 
 ### Per-run top-level fields (results.jsonl)
@@ -149,7 +148,7 @@ Full JSON lines: [`results.jsonl`](results.jsonl).
 ```bash
 # From repo root, OCC build with testlab binary present:
 ./build/apps/testlab/polymesh_testlab run bench/campaigns/varyhedron-baseline-m9
-# on_finish writes PARETO + HANDOFF; warehouse_shots for wire.png
+# on_finish writes PARETO; warehouse_shots for wire.png
 ```
 
 Re-runs produce new numbers; the **frozen** snapshot is the committed

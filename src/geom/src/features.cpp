@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "geom/features.hpp"
 
+#include "tri_normal.hpp"
+
 #include <Eigen/Geometry>
 
 #include <algorithm>
@@ -13,30 +15,6 @@
 
 namespace polymesh::geom {
 namespace {
-
-Eigen::Vector3d tri_normal(const TriSurface& s, std::size_t t) {
-    const auto& tri = s.triangles[t];
-    const Eigen::Vector3d ab = s.vertices[tri[1]] - s.vertices[tri[0]];
-    const Eigen::Vector3d ac = s.vertices[tri[2]] - s.vertices[tri[0]];
-    const Eigen::Vector3d n = ab.cross(ac);
-    const double len = n.norm();
-    if (len > 0.0) {
-        return Eigen::Vector3d(n / len);
-    }
-    return Eigen::Vector3d(0.0, 0.0, 1.0);
-}
-
-[[maybe_unused]] double point_segment_distance(const Eigen::Vector3d& p,
-                                               const Eigen::Vector3d& a,
-                                               const Eigen::Vector3d& b) {
-    const Eigen::Vector3d ab = b - a;
-    const double denom = ab.squaredNorm();
-    if (denom == 0.0) {
-        return (p - a).norm();
-    }
-    const double t = std::clamp((p - a).dot(ab) / denom, 0.0, 1.0);
-    return (p - (a + t * ab)).norm();
-}
 
 // Uniform grid over sharp-edge AABBs for accelerated closest-feature queries
 // (mirrors mesh::SurfaceGrid). A real CAD part has ~10^4 sharp edges; brute
@@ -234,10 +212,10 @@ std::vector<SharpEdge> detect_sharp_edges(const TriSurface& surface, double shar
             continue;
         }
         if (tris.size() != 2) {
-            continue; // non-manifold — treat as feature
+            continue; // non-manifold: not reported
         }
-        const Eigen::Vector3d n0 = tri_normal(surface, tris[0]);
-        const Eigen::Vector3d n1 = tri_normal(surface, tris[1]);
+        const Eigen::Vector3d n0 = detail::tri_normal(surface, tris[0]);
+        const Eigen::Vector3d n1 = detail::tri_normal(surface, tris[1]);
         const double c = std::clamp(n0.dot(n1), -1.0, 1.0);
         // Flat ⇒ cos≈1. Sharp crease ⇒ cos smaller.
         if (c < cos_thresh) {

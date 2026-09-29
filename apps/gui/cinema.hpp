@@ -2,46 +2,31 @@
 #pragma once
 
 // The showcase film: the deployed advisor network choosing a mesh, the mesher
-// building the one it chose, and the solver's own answer appearing in the order
-// it is computed -- all on a virtual clock, so a headless recording is identical
-// whatever the real frame rate was.
+// building it, and the solver's answer appearing in the order it is computed --
+// on a virtual clock, so a headless recording is independent of frame rate.
 //
-// HONESTY IS THE POINT OF THIS FILE. Every node fill is a value from the
-// production ONNX graph's trunk taps (`advisor::ActivationFrame::input/fc1/
-// fc2/heads`), every connection strength is |w_ji * a_i| from the exported
-// weight blocks (`advisor::NetworkEdges::weights`), every element in the reveal
-// is an element the mesher emitted (`pipeline::MeshStage::mesh`), every field is
-// one that pass really produced (`pipeline::SolveStage::result`) or is computed
-// from it by a named function, and every number on screen is the struct field or
-// the function named beside it. Only TIME, opacity, the shrink-toward-centroid
-// reveal, the spatial handoff front and the load factor are interpolated -- and
-// the load factor is interpolated because linear elastostatics makes u(λ) = λ·u
-// exact, so every frame of that ramp is a real solution rather than a blend of
-// two. A handoff front keeps the previous measured field ahead of the arriving
-// measured field; only its narrow highlight band blends their display colours.
-// No displayed number is ever interpolated, and no activation, element count,
-// error indicator or progress value is ever synthesised. When a source is
-// missing the surface says WHICH one and skips that beat; it never substitutes a
-// plausible value.
+// Truthful-display invariants (ADR-0043; full disclosures and citations in
+// docs/assets/cinema/NOTES.md):
+// - Every drawn value comes from the pipeline: node fills are the production
+//   ONNX graph's trunk taps (`advisor::ActivationFrame::input/fc1/fc2/heads`),
+//   connection strengths are |w_ji * a_i| from `advisor::NetworkEdges::weights`,
+//   cells are the mesher's own (`pipeline::MeshStage::mesh`), fields are those a
+//   pass produced (`pipeline::SolveStage::result`) or a named function of them.
+// - Only time, opacity, the shrink-toward-centroid reveal, the spatial handoff
+//   front and the load factor λ are interpolated. λ is exact because linear
+//   elastostatics gives u(λ) = λ·u. A handoff front keeps the previous measured
+//   field ahead of the arriving one; only its highlight band blends colours.
+// - No displayed number is interpolated; no activation, element count, error
+//   indicator or progress value is synthesised. A missing source is named on
+//   screen and its beat skipped, never substituted.
+// - Sequence, not simultaneity: `Advisor::explain()` completes before the mesh
+//   exists. The build act holds the pass that chose the action while its
+//   halo/trace replay is time-aligned with the later mesh snapshots; the
+//   on-screen disclosure and manifest state that the two ran sequentially.
 //
-// IT IS ALSO MEANT TO BE READ BY SOMEONE WHO DID NOT WRITE IT. The film's
-// constant-height ledger sets headline/numbers in the left column, one
-// plain-language disclosure in the right, and full-width provenance below.
-// The solver pane follows the same rule: one active equation plus one graph
-// derived from the real field, not seven dim equations competing at once.
-// `docs/assets/cinema/NOTES.md` keeps the exhaustive disclosures and citations.
-// A disclosure nobody can read at README size is not a disclosure (ADR-0043).
-//
-// SEQUENCE, NOT SIMULTANEITY. `Advisor::explain()` completes before the mesh
-// exists. The film first shows those measured passes, then holds the pass that
-// chose the action while a halo/trace replay is time-aligned with the later real
-// mesh snapshots. That pairing explains cause and effect; the on-screen
-// disclosure and manifest still state that the two computations ran
-// sequentially. No activation or cell is moved to a different recorded source.
-//
-// This module owns no studio state: the app hands it a `CinemaHud` snapshot of
-// what the app already measured, so the HUD cannot drift from what the panels
-// would report, and nothing in the studio changes when cinema is off.
+// The module owns no studio state: the app passes a `CinemaHud` snapshot of
+// values it already measured, and nothing in the studio changes when cinema is
+// off.
 
 #include "pipeline/scene.hpp"
 #include "viewport.hpp"
@@ -79,11 +64,8 @@ enum class SkeletonSource {
 /// exact frame count, not an exact act sum); past the end the composition holds
 /// the final frame rather than looping.
 ///
-/// `kMeshHold` exists because the mesh is the thing this project builds and the
-/// film used to cut away from it on the same frame the last element landed. It
-/// is the finished fill, complete, held still, with its own counts on screen --
-/// the beat a reader needs in order to see what was made before being shown
-/// what it is for.
+/// `kMeshHold` holds the finished fill, complete and still, with its own counts
+/// on screen, before the solve shows what it is for.
 enum class CinemaAct { kSkeleton = 0, kDeliberate, kBuild, kMeshHold, kSolve };
 
 /// Where the closing act is inside the real solve / estimate / refine loop.
@@ -114,14 +96,6 @@ enum class SolvePhase {
     kHold,          // λ = 1, the finished answer
 };
 
-/// Phase id, for the manifest and the notes. Stable text.
-[[nodiscard]] const char* cinema_solve_phase_name(SolvePhase phase);
-
-/// True for the beats that are a still hold of whatever the beat before them
-/// finished. One predicate, so the pause the schedule pays for and the pause the
-/// caption claims cannot disagree.
-[[nodiscard]] bool cinema_phase_is_hold(SolvePhase phase);
-
 /// Which real mesh the viewport's per-element cinema buffer should be holding.
 ///
 /// Two different meshes are revealed element by element in this take and they
@@ -145,25 +119,16 @@ enum class CinemaMeshSource {
 /// and the render script reads the table it prints.
 inline constexpr int kCinemaActCount = 5;
 
-/// One composed row of text and the palette colour it is drawn in.
-struct CinemaLine {
-    ImVec4 color{1, 1, 1, 1};
-    std::string text;
-};
-
 /// The type the film is set in.
 ///
-/// Sizes are in pixels at a 1080-line frame and scale with the frame height, so
-/// the same composition is legible at 720p and does not become a wall of giant
-/// text at 4K. They are this large for one measured reason: the README embeds a
-/// GIF that is downscaled to roughly half the recorded width, so a 15 px row --
-/// what this surface used to set its prose at -- arrives at the reader as 7 px
-/// and cannot be read at all. The headline survives that halving; so do the
-/// numbers.
+/// Sizes are in pixels at a 1080-line frame and scale with the frame height.
+/// They are large because the README GIF is downscaled to about half the
+/// recorded width; the headline and numbers must stay legible after that.
 struct CinemaType {
     /// The face to draw with. Null falls back to the UI font, which is correct
     /// but soft at these sizes: ImGui rasterises one size per face and scales
-    /// the rest. `main.cpp` loads a second face at `kAtlasSize` for this.
+    /// the rest. `load_ui_font` (chrome.cpp) loads a second face at
+    /// `kCinemaAtlasSize` for this.
     ImFont* font = nullptr;
     float headline = 40.0f; // the plain-English sentence
     float numbers = 27.0f;  // the numbers that matter on this beat
@@ -294,9 +259,7 @@ struct CinemaHud {
     /// exaggeration targets a stated fraction of this length.
     double model_diagonal = 0.0;
     /// Resultant of every `SimSetup::LoadSpec::force` this take is solving, in
-    /// newtons. Stated beside the load factor λ so "λ = 0.500" reads as a real
-    /// load case (264.099 N of 528.198 N on the film's part) rather than as a
-    /// fraction of an unnamed quantity.
+    /// newtons. Stated beside the load factor λ so it reads as a real load case.
     double load_newtons = 0.0;
     std::size_t nodes = 0;         // node count as the studio's own DOF line uses it
     std::size_t elements = 0;      // element count from the same mesh
@@ -611,15 +574,11 @@ class CinemaState {
 
     /// |∇σ_vm| at every node of solve stage `index`, from
     /// `fea::nodal_scalar_gradient_magnitude` on that pass's own von Mises
-    /// field and its own mesh, in Pa/m. Computed on first use and cached: the
-    /// recovery is a least-squares fit per node over that node's element patch.
-    /// It is cached rather than paid per frame, and the virtual clock means a
-    /// first-use stall cannot change a recorded frame.
+    /// field and mesh, in Pa/m. Computed on first use and cached; the virtual
+    /// clock means a first-use stall cannot change a recorded frame.
     ///
-    /// Empty when the stage does not exist or the recovery could not run. The
-    /// gradient beat then says so and draws no gradient field, because a
-    /// gradient this module made up would be exactly the invention this whole
-    /// surface exists to rule out.
+    /// Empty when the stage does not exist or the recovery could not run; the
+    /// gradient beat then says so and draws no gradient field.
     [[nodiscard]] const std::vector<double>& gradient_field(std::size_t index);
     /// Nodes whose patch could not determine a gradient, from the same call.
     /// Disclosed on screen when nonzero.
@@ -646,9 +605,9 @@ class CinemaState {
     void seek_frame(int index) { t = static_cast<double>(index) * kRecordStep; }
 
     /// Which mesh the viewport's per-element cinema buffer currently holds.
-    /// Public so `sync_cinema_viewport` can keep the upload to actual changes:
-    /// `Viewport::set_cinema_mesh` rebuilds every element's own faces (1296 B
-    /// per tet4 cell), which is not a per-frame cost.
+    /// Public so `sync_cinema_viewport` uploads only on change:
+    /// `Viewport::set_cinema_mesh` rebuilds every element's own faces, which is
+    /// not a per-frame cost.
     CinemaMeshSource uploaded_mesh_source = CinemaMeshSource::kNone;
     int uploaded_mesh_index = -1;
     /// Index of the solve stage whose `SolveResult` is currently uploaded to
@@ -705,10 +664,8 @@ class CinemaState {
 void cinema_act_window(const CinemaState& state, CinemaAct act, double& t0, double& t1);
 
 /// Length of the opening fade-up at the current take length, seconds:
-/// `CinemaState::kOpeningFade`, but never more than half the opening act.
-/// A 120-frame take gives the skeleton act 0.24 s, and a fixed 0.5 s fade
-/// would mean the outline never reached full strength inside its own act --
-/// the opening would be a grey ghost of the part for the whole shot.
+/// `CinemaState::kOpeningFade`, but never more than half the opening act, so a
+/// short take's outline still reaches full strength inside its own act.
 /// Also fixes the poster frame: the first frame at or after this is the first
 /// fully composed one, which is what the recorder reports.
 [[nodiscard]] double cinema_opening_fade(const CinemaState& state);

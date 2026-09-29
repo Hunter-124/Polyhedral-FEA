@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BSD-3-Clause
-# Build PolyMesh and stage an install tree; --bundle also creates the Linux release payload.
+# Build PolyMesh with the CMake presets and stage an install tree; --bundle also
+# creates the Linux release payload.
 # Usage: ./build.sh [--bundle] [Release|Debug]
+#        Release -> preset `release` (build/), Debug -> preset `debug` (build-debug/)
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
+
 BUNDLE=0
 if [[ "${1:-}" == "--bundle" ]]; then
   BUNDLE=1
@@ -15,7 +17,10 @@ if [[ "$#" -gt 1 ]]; then
   echo "Usage: $0 [--bundle] [Release|Debug]" >&2
   exit 2
 fi
-BUILD_TYPE="${1:-Release}"
+case "${1:-Release}" in
+  [Dd]ebug) PRESET=debug; BUILD_DIR=build-debug ;;
+  *)        PRESET=release; BUILD_DIR=build ;;
+esac
 NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 if [[ "$NPROC" -gt 4 ]]; then
   NPROC=4
@@ -30,22 +35,14 @@ if [[ "$BUNDLE" -eq 1 ]]; then
   BUILD_TARGETS+=(polymesh-webd)
 fi
 
-echo "[polymesh] configure ($BUILD_TYPE)..."
-cmake -S . -B build -G Ninja \
-  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-  -DPOLYMESH_WITH_GUI=ON \
-  -DPOLYMESH_WITH_OCC=ON \
-  -DPOLYMESH_WITH_CUDA=OFF \
-  -DPOLYMESH_WITH_OPENMP=ON \
-  -DPOLYMESH_NATIVE_ARCH=OFF \
-  -DPOLYMESH_ENABLE_LTO=OFF \
-  -DPOLYMESH_STATIC_RUNTIME="$STATIC_RUNTIME"
+echo "[polymesh] configure (preset $PRESET)..."
+cmake --preset "$PRESET" -DPOLYMESH_STATIC_RUNTIME="$STATIC_RUNTIME"
 
 echo "[polymesh] build (jobs=$JOBS)..."
-cmake --build build --target "${BUILD_TARGETS[@]}" -j"$JOBS"
+cmake --build --preset "$PRESET" --target "${BUILD_TARGETS[@]}" -j"$JOBS"
 
 echo "[polymesh] install → $PREFIX"
-cmake --install build --prefix "$PREFIX"
+cmake --install "$BUILD_DIR" --prefix "$PREFIX"
 RUN_PREFIX="$PREFIX"
 if [[ "$BUNDLE" -eq 1 ]]; then
   echo "[polymesh] bundle → $BUNDLE_DIR"

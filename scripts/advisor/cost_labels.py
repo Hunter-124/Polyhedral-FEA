@@ -18,8 +18,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Mapping
 
-ROOT = Path(__file__).resolve().parents[2]
-HOSTS_DIR = ROOT / "bench" / "advisor" / "hosts"
+try:
+    from .paths import ADVISOR_DIR
+except ImportError:  # direct `python scripts/advisor/cost_labels.py`
+    from paths import ADVISOR_DIR
+
+HOSTS_DIR = ADVISOR_DIR / "hosts"
 
 
 def finite_float(value: object) -> float | None:
@@ -109,11 +113,16 @@ def self_test() -> None:
     assert solve_bytes(legacy) is None
     assert mesh_work(legacy) is None
 
-    calibration = host_calibration("hunter-pc")
-    assert calibration is not None
-    reference_ms = finite_float(calibration["ref_mesh_ms"])
-    assert reference_ms is not None
-    assert math.isclose(mesh_work({"host": "hunter-pc", "mesh_ms": reference_ms}), 1.0)
+    # Every committed host calibration must turn its own reference mesh time
+    # into exactly one unit of mesh work.
+    hosts = sorted(path.stem for path in HOSTS_DIR.glob("*.json"))
+    assert hosts, f"no host calibration under {HOSTS_DIR}"
+    for host in hosts:
+        calibration = host_calibration(host)
+        assert calibration is not None, host
+        reference_ms = finite_float(calibration["ref_mesh_ms"])
+        assert reference_ms is not None, host
+        assert math.isclose(mesh_work({"host": host, "mesh_ms": reference_ms}), 1.0), host
 
 
 def main() -> int:

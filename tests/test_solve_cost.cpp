@@ -10,6 +10,9 @@
 
 #include <Eigen/OrderingMethods>
 #include <Eigen/SparseCholesky>
+#if defined(POLYMESH_WITH_CHOLMOD)
+#include <Eigen/CholmodSupport>
+#endif
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -160,15 +163,22 @@ ReducedAssembly assemble_reduced_without_cost(const NodalMesh& mesh, const Mater
     return reduced;
 }
 
+// Reference direct solve that skips the cost observation. It must use the SAME
+// leading factorization the product ladder uses, or "bit-identical" would be a
+// claim about which Cholesky was picked rather than about the instrumentation.
 Eigen::VectorXd direct_solve_without_cost(const NodalMesh& mesh, const Material& material,
                                           const Dirichlet& bc, const Eigen::VectorXd& loads) {
     ReducedAssembly reduced = assemble_reduced_without_cost(mesh, material, bc, loads);
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(reduced.stiffness);
-    if (ldlt.info() != Eigen::Success) {
+#if defined(POLYMESH_WITH_CHOLMOD)
+    Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double>> factorization(reduced.stiffness);
+#else
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> factorization(reduced.stiffness);
+#endif
+    if (factorization.info() != Eigen::Success) {
         throw FeaError("test baseline factorization failed");
     }
-    const Eigen::VectorXd free = ldlt.solve(reduced.rhs);
-    if (ldlt.info() != Eigen::Success) {
+    const Eigen::VectorXd free = factorization.solve(reduced.rhs);
+    if (factorization.info() != Eigen::Success) {
         throw FeaError("test baseline back-substitution failed");
     }
     Eigen::VectorXd displacement(3 * static_cast<Eigen::Index>(mesh.nodes.size()));

@@ -3,19 +3,19 @@
 """Which reference truths this repo is allowed to overwrite.
 
 ``bench/reference/corpus/*.json`` holds the answers every campaign is scored
-against. Most of it is now INDEPENDENT of this engine: 64 references come from
+against. Most of it is INDEPENDENT of this engine: 64 references come from
 Gmsh meshing the STEP plus CalculiX solving it (``external-gmsh-mesh+calculix-solver``)
 and 8 are closed-form (``analytic``), with tolerances derived from measured
 convergence rather than guessed. That independence is the entire value of the
 corpus -- it is what makes a campaign score evidence rather than self-assessment.
 
 Two scripts can write those files (``scripts/advisor/promote_truth.py`` and
-``scripts/gen_primitive_corpus.py``), and both used to overwrite whatever was
-there. The rule below is therefore an ALLOWLIST, not a denylist: only truth this
-repo generated itself may be rewritten. A denylist keyed on the sources that
-existed when it was written (``source == "analytic"``) silently stops protecting
-anything added later -- exactly how 128 external metrics ended up one command away
-from being replaced by our own overkill mesher's numbers.
+``scripts/gen_primitive_corpus.py``). The rule below is therefore an ALLOWLIST,
+not a denylist: only truth this repo generated itself may be rewritten. A
+denylist keyed on the sources that existed when it was written
+(``source == "analytic"``) silently stops protecting anything added later, and
+leaves external metrics one command away from being replaced by our own
+overkill mesher's numbers.
 
 Keep this the single definition. Copying the set into each caller reintroduces
 the drift it exists to prevent.

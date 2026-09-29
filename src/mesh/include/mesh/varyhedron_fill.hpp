@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Varyhedron packing fill (ADR-0021 / ADR-0023) — packing-seed engine:
-// protecting balls on **sharp** CAD edges only (seams/smooth skipped) +
-// interior bubble seeds + graded tet scaffold + soft snap to sharp features.
-// Poly export target: constrained restricted CVT / clipped Voronoi (M5 path);
-// dual-of-tet deferred. Export remains a tet scaffold for FE today.
+// Varyhedron packing fill (ADR-0021; algorithm per ADR-0023) — a core mesher.
+// Protecting balls on **sharp** CAD edges only (seams/smooth skipped) +
+// bubble-packed interior seeds drive a graded tet mesh; boundary nodes are then
+// pinned to CAD vertices / sharp edges and wall nodes slide on the live BRep.
+// FE export is that CAD-edge-seeded graded-tet scaffold; polyhedral export
+// (restricted CVT / clipped Voronoi) is tracked in docs/STATUS.md.
 
 #include "geom/cad_model.hpp"
 #include "geom/cad_topology.hpp"
@@ -49,7 +50,7 @@ struct VaryhedronFillOutput {
     /// segments (ADR-0023). ℓ = mesh edge length; κ from CAD curve curvature.
     double edge_chordal_efficiency_max = 0.0;
     double edge_hausdorff_over_h = 0.0;
-    /// M10 wall free-slide + OCC re-project diagnostics (0 when skipped).
+    /// Wall free-slide + OCC re-project diagnostics (0 when skipped).
     std::size_t n_wall_nodes = 0;
     std::size_t n_wall_moved = 0;
     std::size_t n_wall_reverted = 0;
@@ -57,14 +58,14 @@ struct VaryhedronFillOutput {
     double wall_mean_surface_residual = 0.0;
 };
 
-/// Pack volume mesh with varyhedron packing-seed algorithm (ADR-0023).
+/// Pack volume mesh with the varyhedron packing-seed algorithm (ADR-0023).
 /// When `topo` is non-null, **sharp** CAD edge samples become protecting seeds;
 /// seams/smooth edges are never fixed sites. Interior volume seeds pack away
-/// from them; free nodes near sharp edges soft-snap after the tet scaffold.
-/// When `cad` is non-null (live BRep), wall nodes (boundary, far from sharp
-/// edges) get tangential smooth + OCC surface re-project (M10 / ADR-0024 Q2a).
-/// `wall_smooth_iters` ≤ 0 disables that post-pass. STL-only (no cad): existing
-/// surface snap path only — no crash.
+/// from them and both seed the graded tet scaffold. With `topo` and a live
+/// `cad`, free-boundary nodes are then pinned to CAD vertices / sharp edges.
+/// With a live `cad`, wall nodes (boundary, far from sharp edges) get tangential
+/// smooth + OCC surface re-project (ADR-0024 Q2a); `wall_smooth_iters` ≤ 0
+/// disables that post-pass. STL-only (no cad): the scaffold's surface snap only.
 VaryhedronFillOutput varyhedron_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,

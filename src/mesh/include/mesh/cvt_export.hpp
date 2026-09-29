@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// G4: export clipped restricted-Voronoi cells as product PolyMesh polyhedra.
-// Dual-of-tet remains hard-blocked — these cells *are* the poly path
-// (ADR-0024 Q8 / ADR-0025).
-//
-// M5: optional BRep/surface-domain clip so cells stop at the solid interior
-// (not the AABB). Domain faces then land on the tessellated surface, which is
-// required for honest load_area_ok on plate_hole / cylinder.
+// Clipped restricted-Voronoi cells exported as product PolyMesh polyhedra —
+// these cells are the polyhedral path; dual-of-tet stays blocked
+// (ADR-0024 Q8 / ADR-0025). Cells can be clipped to the solid (surface
+// halfspaces or a tet scaffold) so domain faces land on the tessellated
+// boundary instead of the AABB.
 
 #include "geom/tri_surface.hpp"
 #include "mesh/cvt_lloyd.hpp"
@@ -62,14 +60,16 @@ struct ClippedVoronoiExport {
     std::vector<std::size_t> site_to_cell;
 };
 
-/// Optional solid-domain clip (M5). When `surface` is non-null and non-empty,
-/// each Voronoi cell is further intersected with local triangle halfspaces
-/// (oriented so the site stays inside). This approximates RVD ∩ Ω without a
-/// full volume tet mesh. `clip_radius ≤ 0` → auto (~2× mean nearest-neighbour).
+/// Optional solid-domain clip for export_clipped_voronoi. When `surface` is
+/// non-null and non-empty, every cell is intersected with one global set of
+/// supporting halfspaces from the surface triangles (≤ 8000, strided), i.e.
+/// the convex envelope of the solid; use export_rvd_tet_clipped for
+/// non-convex solids.
 struct DomainClipParams {
     const geom::TriSurface* surface = nullptr;
+    /// Unused: global planes need no local clip radius.
     double clip_radius = 0.0;
-    /// Skip triangles whose area is below this fraction of mean area (noise).
+    /// Unused: planes are filtered by an absolute degeneracy floor instead.
     double min_area_frac = 1e-8;
 };
 
@@ -87,14 +87,7 @@ export_clipped_voronoi(const ClipBox& domain, std::span<const Eigen::Vector3d> s
 export_clipped_voronoi(const ClipBox& domain, std::span<const CvtSite> sites,
                        const DomainClipParams& domain_clip = {});
 
-/// Build inward-oriented clip planes from a closed triangle surface, each
-/// plane oriented so `interior_hint` is on the keep side (a·x+d ≥ 0).
-/// Used by tests and by export when precomputing global planes for convex Ω.
-[[nodiscard]] std::vector<ClipPlane>
-domain_planes_from_surface(const geom::TriSurface& surface,
-                           const Eigen::Vector3d& interior_hint, double min_area = 0.0);
-
-/// One tetrahedron used as a solid domain atom for true RVD ∩ Ω (M5).
+/// One tetrahedron used as a solid domain atom for true RVD ∩ Ω.
 /// Vertices must have positive orientation (same as tet_fill).
 struct DomainTet {
     Eigen::Vector3d v0, v1, v2, v3;
@@ -106,8 +99,9 @@ struct DomainTet {
 /// independent cells. Shared fragments are paired by canonical identity after
 /// the global tolerance weld, and edge-connected coplanar fragments are
 /// coalesced into true polygon faces before VEM conversion. Domain-boundary
-/// faces remain on the tet-mesh skin. This supports non-convex solids such as
-/// plate_hole where one global halfspace intersection is invalid.
+/// faces remain on the tet-mesh skin. This supports non-convex solids, where
+/// one global halfspace intersection is invalid. `tet_search_radius` is
+/// unused: a per-site security radius bounds the tet search.
 /// Requires POLYMESH_WITH_GEOGRAM.
 [[nodiscard]] ClippedVoronoiExport
 export_rvd_tet_clipped(const ClipBox& domain, std::span<const Eigen::Vector3d> sites,

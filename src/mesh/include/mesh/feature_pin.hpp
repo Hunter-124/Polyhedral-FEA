@@ -8,9 +8,7 @@
 // nearest point of the *surface*. On a 90° crease between a curved wall and a
 // planar cap that nearest point is on one of the two faces, never on the edge
 // between them, so the crease is reconstructed as a chamfer whose width is set
-// by the lattice, not the CAD. Measured before this pass, icecream_cone at
-// h = 8 mm: mesh feature segments sat p99 = 17.9·h from the nearest sharp BRep
-// edge, and the shipped mesh carried 246 spurious crease segments.
+// by the lattice, not the CAD.
 //
 // This pass fixes the two feature classes the surface projector structurally
 // cannot:
@@ -25,9 +23,9 @@
 // pinned arclength parameters come out of the lattice unevenly (the lattice
 // samples the curve where its cells happen to cross it), and uneven spacing on
 // a curved crease is exactly the sawtooth the user sees. Closed chains are
-// re-spaced through a periodic low-pass of the curve's coordinate signals, so
-// a circular rim keeps its two true modes and loses the lattice noise; open
-// chains use plain cumulative-chord arclength. Pinning itself is always the
+// re-spaced through a periodic low-pass of the chain's arclength-parameter
+// signal, so the lattice noise is removed; open chains use plain
+// cumulative-chord arclength. Pinning itself is always the
 // exact OCC projection — Fourier only chooses *where along the curve* a node
 // sits, never where the curve is.
 //
@@ -82,8 +80,8 @@ struct FeaturePinReport {
 /// @param boundary_nodes Candidate node ids (free-surface nodes).
 /// @param h             Characteristic size; capture radii scale with it.
 /// @param node_offends  True when any cell incident to the node is invalid.
-///                      A pin that offends is retreated along its own segment
-///                      (0.75/0.5/0.25) and abandoned if no fraction is legal.
+///                      A pin that offends is reverted in full; there is no
+///                      partial pin.
 /// @param provenance    Optional per-node owner slots, grown as needed, so the
 ///                      later smoothing/wall passes see the pins as owned.
 /// @param mirror        Optional verified reflection symmetry (mesh/mirror.hpp).

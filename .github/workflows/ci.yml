@@ -76,12 +76,11 @@ jobs:
         # code that throws either way, and -O2 raises strictly more -W warnings
         # than -O0 for the -Werror build below. Debug info is kept so a failing
         # test still symbolises.
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DPOLYMESH_WITH_GUI=ON \
-            -DPOLYMESH_WITH_OCC=ON \
-            -DPOLYMESH_WITH_CUDA=OFF
+        #
+        # The preset (CMakePresets.json) is exactly: -G Ninja -B build
+        # -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPOLYMESH_WITH_GUI=ON
+        # -DPOLYMESH_WITH_OCC=ON -DPOLYMESH_WITH_CUDA=OFF.
+        run: cmake --preset relwithdebinfo-ci
 
       - name: Build (warnings are errors)
         timeout-minutes: 15

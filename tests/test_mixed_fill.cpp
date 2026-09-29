@@ -264,6 +264,30 @@ std::pair<std::size_t, double> bore_wall(const fea::NodalMesh& mesh, double radi
 
 } // namespace
 
+TEST_CASE("a resolvable bore wall cannot be absorbed when the coarse fill closes its hole",
+          "[cad][mesh][geometry-completeness]") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    // The plate surfaces remain close to every bore sample, but their normals
+    // are orthogonal. Thickness exceeds the absorption scale: distance alone
+    // must not let this mesh erase the hole.
+    // Exact fixture: 40 x 40 x 1 plate with a radius-1.5 through bore.
+    const auto model = pipeline::Model::load("tests/fixtures/parts/missing_bore_guard.brep");
+    constexpr double h = 10.0;
+    bool refused = false;
+    try {
+        (void)pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kHybrid,
+                                    /*skin_layers=*/2, /*feature_refine=*/false);
+    } catch (const pipeline::GeometryVolumeLimitError& error) {
+        refused = true;
+        CHECK_FALSE(error.solved_stage);
+        CHECK(std::string(error.what()).find("feature unresolved") != std::string::npos);
+        CHECK(error.assessment.relative_error < pipeline::kGeometryVolumeHardLimit);
+    }
+    REQUIRE(refused);
+}
+
 TEST_CASE("box-hole bore survives the coarse-grid parity ladder",
           "[cad][hybrid][geometry-completeness]") {
     constexpr char kBoxHole[] = "bench/geometries/corpus/primitives/box_hole_s0.step";

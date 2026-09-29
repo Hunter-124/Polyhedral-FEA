@@ -4,6 +4,7 @@
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -13,6 +14,7 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepLProp_CLProps.hxx>
@@ -20,6 +22,7 @@
 #include <BRepTools.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
 #include <BRep_Tool.hxx>
+#include <Bnd_OBB.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom2d_Curve.hxx>
 #include <GeomAbs_SurfaceType.hxx>
@@ -537,6 +540,16 @@ CadTopology extract_topology(const CadModel& model, int samples_per_edge) {
         GProp_GProps props;
         BRepGProp::SurfaceProperties(f, props);
         cf.area = props.Mass();
+        // Exact geometry, not tessellation deflection: a micron-high rim must
+        // not acquire a millimetre width from the viewport's triangulation.
+        Bnd_OBB bounds;
+        BRepBndLib::AddOBB(f, bounds, Standard_False, Standard_True, Standard_False);
+        if (!bounds.IsVoid()) {
+            std::array<double, 3> extents{2.0 * bounds.XHSize(), 2.0 * bounds.YHSize(),
+                                          2.0 * bounds.ZHSize()};
+            std::sort(extents.begin(), extents.end());
+            cf.min_extent = extents[cf.kind == CadSurfaceKind::kPlane ? 1 : 0];
+        }
 
         // A plane's curvature is identically zero, so a uv grid on it can only
         // report what its kind already says. Skip it and the grid cost is paid

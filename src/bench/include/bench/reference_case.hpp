@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Verification harness (see BENCHMARKS.md).
+// Verification harness (see docs/benchmarks.md).
 //
 // This is the ONLY module allowed to read bench/reference/ — reference
 // values must never appear in, or be read by, mesh, adapt, or fea
-// (engineering rule #1 in CLAUDE.md).
+// (anti-cheat rules, CONTRIBUTING.md §4).
 
 #include <filesystem>
 #include <map>

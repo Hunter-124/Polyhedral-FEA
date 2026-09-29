@@ -1,3 +1,5 @@
+> Superseded by [0012](0012-portable-cost-retrain.md); historical record.
+
 # 0011 — v7 retrain: authoritative curved CAD geometry
 
 Status: landed 2026-08-18. Supersedes [0010](0010-v6-exterior-conformity-retrain.md).

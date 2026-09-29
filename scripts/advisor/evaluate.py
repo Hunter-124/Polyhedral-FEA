@@ -13,7 +13,7 @@ chosen action is than that best, in log10 units, so 0.30 of regret means
 Two properties of this script matter more than the numbers it prints:
 
 * **It scores the shipped rule.** ``advisor_policy`` reproduces what
-  ``src/advisor/src/advisor.cpp`` does in production -- query the policy head
+  ``Advisor::decide`` (``src/advisor/src/advisor_decide.cpp``) does in production -- query the policy head
   once at the clamp-box default action, decode, clamp, argmax -- next to
   ``advisor_argmin``, which enumerates the candidates and takes the argmin of
   the predicted ``rel_err_rel`` head. Those are different policies and only one
@@ -47,8 +47,9 @@ if __package__ in (None, ""):  # direct `python scripts/advisor/evaluate.py`
 
 from . import regret as R  # noqa: E402
 from .crossval import build_choosers  # noqa: E402
-from .dataset import ADVISOR_DIR, add_split_args, group_of, load_from_args  # noqa: E402
+from .dataset import add_split_args, load_from_args  # noqa: E402
 from .model import AdvisorNet  # noqa: E402
+from .paths import ADVISOR_DIR  # noqa: E402
 
 #: ``latest.pt`` is the trainer's resume point — the LAST run, not the best
 #: one. Evaluation reports what would ship, so it reads ``best.pt`` (the best

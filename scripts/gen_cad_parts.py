@@ -352,7 +352,7 @@ WISHBONE_EYE_CENTRES = (
 )
 # Ring and member radii are sized by minimum wall thickness, not by looks. The
 # meshing pipeline snaps boundary nodes to the exact BRep inside a band of
-# 1.5 * fill_h (scene.cpp), so any wall thinner than that band lets the two
+# 1.5 * fill_h (volume_mesh.cpp), so any wall thinner than that band lets the two
 # sides snap onto each other and the skin goes non-manifold. An earlier
 # 24/9.5 mm eye and 28/12 mm boss left a 14.5 mm minimum wall, which failed
 # the product fill guard at h = 8 mm and h = 16 mm. These radii hold a 22 mm

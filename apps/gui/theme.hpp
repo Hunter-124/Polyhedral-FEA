@@ -75,6 +75,8 @@ struct Palette {
     ImVec4 status_ok{0.459f, 0.859f, 0.549f, 1};
     ImVec4 status_warn{0.953f, 0.761f, 0.420f, 1};
     ImVec4 status_err{0.961f, 0.549f, 0.420f, 1};
+    // results legend (theme-independent)
+    ImU32 colorbar_border = IM_COL32(255, 255, 255, 80); // translucent white frame
 };
 
 /// Active chrome palette (read by widgets; never hardcode colors).

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PolyMesh competitive smoke: build (if needed) + Tier-0/Tier-1 ctest subset.
-# Full peer harness (CalculiX/Elmer decks) lands later under peers/.
+# Peer runners live under peers/; this script only exercises PolyMesh itself.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -19,7 +19,6 @@ cmake --build "$BUILD"
 
 # Catch2 discovers test names from section titles. Match Tier-0 gates and
 # primary Tier-1 analytical cases used on the scoreboard.
-# Full peer comparison is not wired yet — this only proves PolyMesh still passes.
 echo "==> ctest smoke (Tier-0 + Tier-1 subset)"
 ctest --test-dir "$BUILD" --output-on-failure -R \
   'patch test|rigid-body|eigenvalue|cantilever|Lamé|Kirsch|Goodier|L-domain'

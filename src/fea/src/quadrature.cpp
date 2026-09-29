@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/quadrature.hpp"
 
+#include "gauss_legendre.hpp"
+
 #include <array>
 #include <cmath>
 #include <format>
 #include <span>
 
 namespace polymesh::fea {
-namespace {
-
-struct Gauss1d {
-    std::span<const double> nodes;   // on [-1, 1]
-    std::span<const double> weights; // sum to 2
-};
+namespace detail {
 
 Gauss1d gauss_1d(int n) {
     // Standard Gauss-Legendre nodes/weights; symmetric pairs listed explicitly.
@@ -56,6 +53,10 @@ Gauss1d gauss_1d(int n) {
     }
 }
 
+} // namespace detail
+
+namespace {
+
 /// Tet rule via the Duffy transform: map the unit cube (u,v,w) onto the
 /// reference tet by xi = u, eta = v(1-u), zeta = w(1-u)(1-v), with Jacobian
 /// (1-u)^2 (1-v). A degree-d integrand on the tet becomes a polynomial of
@@ -63,7 +64,7 @@ Gauss1d gauss_1d(int n) {
 /// axis are exact by construction — no memorized point tables to get wrong.
 std::vector<QuadraturePoint> tet_rule_duffy(int degree) {
     const int n = (degree + 3 + 1) / 2; // ceil((degree + 3) / 2)
-    const auto g = gauss_1d(n);
+    const auto g = detail::gauss_1d(n);
     std::vector<QuadraturePoint> rule;
     rule.reserve(static_cast<std::size_t>(n) * static_cast<std::size_t>(n) *
                  static_cast<std::size_t>(n));
@@ -102,7 +103,7 @@ std::vector<QuadraturePoint> tet_rule(int degree) {
 }
 
 std::vector<QuadraturePoint> hex_rule(int points_per_axis) {
-    const auto g = gauss_1d(points_per_axis);
+    const auto g = detail::gauss_1d(points_per_axis);
     std::vector<QuadraturePoint> rule;
     const auto n = static_cast<std::size_t>(points_per_axis);
     rule.reserve(n * n * n);
@@ -125,17 +126,14 @@ std::vector<QuadraturePoint> pyramid_rule() {
     // carries the factor t, and xi,eta keep their full ±1 range. The collapse
     // lives in det(J) (∝ t²), so the rule must NOT re-apply it.
     //
-    // The previous rule placed points on the reference *pyramid* (xi = a·s with
-    // a=(1-zeta)/2) and weighted by the Duffy Jacobian a². Against a cube-domain
-    // map that double-counts the collapse: it integrates (1-zeta)⁴ where the map
-    // needs (1-zeta)², yielding exactly 0.6× the true volume of every pyramid
-    // (1/10 instead of 1/6 on the unit-hex fan). That fed the fill-volume guard,
-    // assemble_body_load and the ZZ recovery rule alike.
+    // Integrating on the reference *pyramid* with the Duffy Jacobian instead
+    // would double-count the collapse ((1-zeta)⁴ where the map needs
+    // (1-zeta)²), giving 0.6× the true volume.
     //
     // 3-point Gauss per axis integrates det(J) (degree ≤ 2 in zeta, ≤ 1 in
     // xi,eta for a straight-edged pyramid) exactly, and never samples the apex
     // zeta=1 where J is singular.
-    const auto g = gauss_1d(3);
+    const auto g = detail::gauss_1d(3);
     std::vector<QuadraturePoint> rule;
     rule.reserve(g.nodes.size() * g.nodes.size() * g.nodes.size());
     for (std::size_t iz = 0; iz < g.nodes.size(); ++iz) {
@@ -158,16 +156,15 @@ std::vector<QuadraturePoint> prism_rule() {
         {1.0 / 6.0, 2.0 / 3.0},
     }};
     const double tri_w = 1.0 / 6.0; // each of 3 pts: area 1/2 * 1/3
-    const std::array<double, 2> z_nodes{{-0.5773502691896257, 0.5773502691896257}};
-    const std::array<double, 2> z_w{{1.0, 1.0}};
+    const auto g = detail::gauss_1d(2);
     std::vector<QuadraturePoint> rule;
     rule.reserve(6);
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 2; ++j) {
             rule.push_back({{tri_xi[static_cast<std::size_t>(i)][0],
                              tri_xi[static_cast<std::size_t>(i)][1],
-                             z_nodes[static_cast<std::size_t>(j)]},
-                            tri_w * z_w[static_cast<std::size_t>(j)]});
+                             g.nodes[static_cast<std::size_t>(j)]},
+                            tri_w * g.weights[static_cast<std::size_t>(j)]});
         }
     }
     return rule;

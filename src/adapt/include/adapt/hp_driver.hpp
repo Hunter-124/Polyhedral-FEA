@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Joint (h, p, shape) adaptive driver (ADR-0019 §4, DAG node hp-driver).
+// Joint (h, p, shape) adaptive driver (ADR-0019 §4).
 //
 // One loop looks at three signals per element and turns the matching knob:
 //
@@ -23,10 +23,9 @@
 //      prefers another bulk form (hex / tet / native-poly VEM), emit a shape
 //      vote. Aggregate votes become a global mesher tendency for the next fill.
 //   4. Cost. Each candidate action is scored as predicted_benefit / relative
-//      DOF cost (calibrated heuristics; campaign-fitted weights land with
-//      feedback-loop). Highest utility wins. Ties break in fixed order
-//      h > p > shape > none, then by element index for full determinism
-//      (seed only reorders equal-utility shape votes, not the primary pick).
+//      DOF cost (heuristic weights in HpDriverPolicy). Highest utility wins;
+//      ties break in fixed order h > p > shape. `HpDriverPolicy::seed` does
+//      not influence any decision.
 //   5. Coarsen (lowest priority). Only when an element would otherwise stay
 //      at kNone: if it lies in the anti-Dörfler tail (insignificant η² mass)
 //      and its h is finer than the a-priori geometry demand allows
@@ -37,7 +36,7 @@
 // The driver does not hardcode benchmark answers: callers supply synthetic or
 // measured indicators. Product path uses ZZ η + geometry sizing attributes;
 // hierarchical surplus may be estimated from η ranking when modal surpluses
-// are not yet available.
+// are absent.
 
 #include "adapt/loop.hpp"
 
@@ -86,7 +85,7 @@ struct ElementHpSignal {
     double poly_fit = 0.5;
 };
 
-/// Calibrated thresholds and cost weights (v1 heuristics; campaign override later).
+/// Heuristic thresholds and cost weights.
 struct HpDriverPolicy {
     /// Turning-angle threshold (degrees): refine h when h·κ > θ_rad.
     double turn_angle_deg = 15.0;
@@ -119,8 +118,7 @@ struct HpDriverPolicy {
     double coarsen_geom_factor = 1.5;
     /// Suggested global h multiplier for a pure-coarsen pass (bounded rise).
     double h_coarsen_raise = 1.25;
-    /// Deterministic seed (currently reserved for future stochastic tie noise;
-    /// primary decisions do not depend on it).
+    /// Reserved; no decision reads it.
     std::uint64_t seed = 0;
 };
 

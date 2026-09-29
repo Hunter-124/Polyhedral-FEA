@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Constrained CVT sites + OCC bridge (G3 / ADR-0024 Q2–Q3, ADR-0025).
+// Constrained CVT sites + OCC bridge (ADR-0024 Q2–Q3, ADR-0025).
 // Sharp CAD edges → fixed sites; free interior/wall sites move under Lloyd
-// then free wall candidates re-project via M10 project_point_on_surface.
+// then free wall candidates re-project via geom::project_point_on_surface.
 // Seams are never fixed protectors.
 
 #include "geom/cad_model.hpp"
@@ -54,7 +54,7 @@ struct OccSiteProjectStats {
 };
 
 /// Project free sites that lie within `wall_band` of the domain boundary onto
-/// the live BRep (M10). Sites closer than `sharp_guard` to a **sharp** CAD
+/// the live BRep. Sites closer than `sharp_guard` to a **sharp** CAD
 /// edge are left alone so fixed features stay authoritative.
 /// No-op without OCC / empty cad.
 [[nodiscard]] OccSiteProjectStats
@@ -79,7 +79,7 @@ struct ConstrainedLloydResult {
     ConstrainedSiteSeedResult seed_stats;
 };
 
-/// Full G3 pipeline: seed (sharp fixed + interior free) → Lloyd with ρ=1/h³ →
+/// Full pipeline: seed (sharp fixed + interior free) → Lloyd with ρ=1/h³ →
 /// optional OCC wall project of free sites.
 [[nodiscard]] ConstrainedLloydResult
 constrained_lloyd_cvt(const ClipBox& domain, const geom::CadModel* cad,

@@ -1,6 +1,6 @@
 {
   "name": "xcheck-gcc-1",
-  "comment": "cross-compiler label check: replay the batch-4 grid on the gcc Release build of the 3080 Ti box and diff against the MSVC-labelled rows (docs/training/ACCESS-hunter-pc.md \u00a74 smoke-gate mismatch). NOT named advisor-* so run_batch dedup never suppresses these pairs.",
+  "comment": "cross-compiler label check: replay the batch-4 grid on the gcc Release build of the 3080 Ti box and diff against the MSVC-labelled rows (smoke-gate mismatch; see docs/decisions/0032-stl-order-determinism.md). NOT named advisor-* so run_batch dedup never suppresses these pairs.",
   "warehouse": false,
   "parts": [
     "bench/geometries/corpus/primitives/box_hole_s0_c0.case.json",

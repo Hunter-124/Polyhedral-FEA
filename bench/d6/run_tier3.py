@@ -193,7 +193,7 @@ def write_summary_md(raw: dict[str, Any], path: Path) -> None:
     lines = [
         "# D6 Tier-3 — L-domain uniform tet10 vs graded tet10",
         "",
-        "Instrument for ROADMAP **D6** / SPEC Tier-3 (≥5× DOF, ≥3× wall time vs "
+        "Instrument for former roadmap item **D6** / SPEC Tier-3 (≥5× DOF, ≥3× wall time vs "
         "uniform tet10 baseline, ADR-0005). **Same assembly and linear solver**; only "
         "the mesh density strategy changes (geometric layers toward the re-entrant "
         "corner vs uniform structured tet10).",

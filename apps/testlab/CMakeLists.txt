@@ -1,5 +1,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
-add_executable(polymesh_testlab main.cpp)
+add_executable(polymesh_testlab
+    main.cpp
+    campaign_config.cpp
+    campaign_progress.cpp
+    campaign_runner.cpp
+    probe_selection.cpp
+    run_one.cpp
+    scorecard.cpp
+)
 target_include_directories(polymesh_testlab PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh_testlab
     PRIVATE polymesh::geom polymesh::mesh polymesh::adapt polymesh::fea polymesh::pipeline

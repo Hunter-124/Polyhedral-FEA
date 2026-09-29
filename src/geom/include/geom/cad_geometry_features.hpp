@@ -1,35 +1,28 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Exact-BRep geometry descriptors for the learned mesh advisor's
-// out-of-distribution detector (ADR-0027).
+// Exact-BRep geometry descriptors for the learned mesh advisor (ADR-0027).
 //
-// These are deliberately NOT mesh proxies. `pipeline::CaseFeatures` measures
-// curvature, thinness and face counts from the tessellation, which is why
-// `curved_frac` saturates to ~1.0 for any real triangulation: its formula
-// `(ntri-12)/ntri` cannot distinguish a plate from a sphere. The descriptors
-// here read the BRep itself, so a cylinder is a cylinder and its radius is a
-// number rather than a discrete-curvature estimate.
+// These read the BRep, not a mesh proxy: `pipeline::CaseFeatures` measures
+// curvature, thinness and face counts from the tessellation (its `curved_frac`
+// saturates near 1.0 for any real triangulation), whereas here a cylinder is a
+// cylinder and its radius is a number.
 //
-// They are consumed ONLY by the OOD Mahalanobis distance, never by the network:
-// the shipped ONNX contract is 43 inputs and these 15 are not among them. On a
-// six-family corpus a 1-NN classifier recovers the family from these alone at
-// 32/32, which makes them family identifiers rather than transferable physics --
-// exactly wrong as model inputs and exactly right for "is this part unlike
-// anything I was trained on".
+// Which descriptors the advisor consumes is decided by the shipped artifacts,
+// not by this header: `normalization.json:input_columns` (network inputs) and
+// `ood.json:feature_columns` (OOD Mahalanobis distance) name the `geo_*`
+// columns the deployed model uses.
 //
-// The reference implementation is `scripts/advisor/geometry_features.py`, which
-// produced the training-side table these are compared against. This file mirrors
-// it operation for operation, including the degenerate-case conventions, because
-// a Mahalanobis distance against a mean/precision fitted in Python is only
-// meaningful if the C++ produces the same numbers.
+// Reference implementation: `scripts/advisor/geometry_features.py`. This file
+// mirrors it operation for operation, including the degenerate-case
+// conventions, because the training-side statistics were fitted on its output.
 
 #include "geom/cad_model.hpp"
 
 namespace polymesh::geom {
 
-/// The 15 exact-BRep descriptors, in the order
-/// `bench/advisor/ood.json:feature_columns` declares them.
+/// Exact-BRep descriptors. Artifact column name is `geo_` + field name; field
+/// order matches the descriptor block of `bench/advisor/ood.json:feature_columns`.
 ///
 /// Units: all dimensionless. Lengths are normalised by the bounding-box
 /// diagonal, areas by the total surface area, so the whole block is scale-free

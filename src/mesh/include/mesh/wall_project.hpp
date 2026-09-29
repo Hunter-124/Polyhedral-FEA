@@ -2,7 +2,7 @@
 #pragma once
 
 // Wall tangential smooth + live BRep re-project (ADR-0024 Q2a / M10).
-// Shared post-pass for varyhedron packing and future constrained CVT.
+// Post-pass of the varyhedron packing fill.
 
 #include "geom/cad_model.hpp"
 #include "geom/cad_topology.hpp"

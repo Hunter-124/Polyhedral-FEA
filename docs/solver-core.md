@@ -170,7 +170,8 @@ The adaptive loop looks at three signals and turns the matching knob:
 | **Cost** (measured) | Predicted DOFs and solve time per choice, calibrated from real campaign data | picks the **shape** and trims choices that cost more than they return |
 
 The cost model is not guessed — it is fitted from the test-lab campaigns
-(`bench/campaigns/`, node `feedback-loop`). Every simulation the lab runs
+(`bench/campaigns/`, campaign analysis:
+[docs/process/feedback-loop.md](process/feedback-loop.md)). Every simulation the lab runs
 records mesh time, solve time, DOFs, and accuracy against a hand-calculated
 truth, tagged by the geometric conditions of the part. Over many runs the
 driver learns *which knob actually pays off under which conditions* instead of
@@ -193,7 +194,7 @@ and picks the max; ties break **h > p > shape**:
    casts a shape vote; majority vote becomes `global_shape` for the next
    remesh (`kHybrid`→`kHybridVem` on poly, etc.). Cost weights default to
    \(c_h{=}8\), \(c_p{=}2.5{+}0.4p\), \(c_{\mathrm{shape}}{=}3.5\) until
-   `feedback-loop` calibrates them from campaigns.
+   campaign analysis calibrates them from campaigns.
 
 Product path: `SolveJob` builds signals from ZZ η + surface κ/thickness and
 calls `drive_hp` each adapt pass (`tests/test_hp_driver.cpp` locks the
@@ -229,7 +230,7 @@ Start here and follow the includes:
 - `tests/test_fe_vem_assembly.cpp` — FE/VEM interface constant-strain gate.
 - `src/adapt/include/adapt/hp_driver.hpp` — joint (h, p, shape) decisions;
   `drive_hp` plan feeds seeds, p-elevate indices, and mesher tendency in
-  `src/pipeline/src/scene.cpp`.
+  `SolveJob` (`src/pipeline/src/solve_job.cpp`).
 - `tests/test_hp_driver.cpp` — synthetic indicator gates for the driver.
 - `docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md` — the *why* behind
   every choice above, and the staging plan.
@@ -237,5 +238,141 @@ Start here and follow the includes:
   cells, including the curvature-driven h-refinement and the transition
   handling the VEM path keeps whole when native-poly is on.
 
-The current status of each piece — what is built, what is next — is always in
-`docs/dag/PROGRAM.yaml`.
+The current status of each piece — what is built, what is next — is in
+[docs/STATUS.md](STATUS.md).
+
+---
+
+## 6. What the linear solve costs
+
+(Implementation: `src/fea/src/solve.cpp`, `src/fea/src/assembly.cpp`,
+`src/fea/src/solve_cost.cpp`. Reproduce with the commands below.)
+
+Everything above is about spending degrees of freedom well. This section is
+about what one solve of a given system actually costs, measured, because for a
+long time the CLI's answer to "why is `polymesh solve` slow at h ≤ 8 mm on a
+100 mm part" was a guess.
+
+### 6.1 The direct ladder
+
+K_ff for linear elastostatics with enough constraints to remove the rigid-body
+modes is symmetric positive definite, so the tool is a Cholesky factorization —
+and *which* Cholesky is not a matter of taste. Measured on `plate_hole` at
+h = 6 mm (52,080 curved tet10 cells, 231,849 free DOF, `--threads 4`,
+Release, this host):
+
+| Rung | symbolic (`order`) | numeric (`factor`) | back-substitute | peak RSS | run total |
+|---|---:|---:|---:|---:|---:|
+| `CholmodSupernodalLLT` | 2.29 s | **3.46 s** | 0.11 s | **1.31 GiB** | **40.4 s** |
+| `SimplicialLDLT(AMD)` | 1.32 s | 193.66 s | 0.31 s | 2.43 GiB | 233.8 s |
+| ichol-preconditioned CG | — | did not reach `cg_tol = 1e-8` in over an hour | — | ~0.25 GiB | — |
+
+A scalar simplicial factorization is **56× slower and 1.85× heavier** than the
+supernodal one on this system, because its fill is never amortized into dense
+supernodes where BLAS3 can run. Do not re-order these rungs on the "LDLT is
+lighter than an LU" rule of thumb: that is true against `SparseLU` and
+irrelevant next to a supernodal factorization. `SparseLU(COLAMD)` is the last
+rung and exists only for a genuinely indefinite reduced matrix, where partial
+pivoting is the only thing that can carry it.
+
+The two direct rungs agree to **3.2e-11** relative to the field's own scale on
+the same mesh (max |Δu| 4.5e-16 m on a 1.94e-5 m field; max Δσ_vM 5.2e-4 Pa on
+a 1.65e7 Pa field), which is the roundoff difference between two exact
+factorizations, not a modelling difference.
+
+SuiteSparse is an optional dependency (`POLYMESH_WITH_CHOLMOD`, auto-detected
+through `CHOLMOD.pc` first and the SuiteSparse CMake config second — that order
+matters, see the comment in the root `CMakeLists.txt`). Without it the ladder
+starts at `SimplicialLDLT(AMD)` and `SolveOptions::cg_threshold` keeps its
+historical 50,000 default, because a scalar factorization genuinely does fall
+off a cliff there. With it, the DOF count stops deciding: the threshold becomes
+a 1,500,000-DOF backstop and the memory budget in `decide_solve_method` is what
+chooses CG.
+
+### 6.1a How many threads the factorization gets
+
+CHOLMOD's own OpenMP loops call an OpenMP system BLAS, so two nested pools
+each sized to every hardware thread oversubscribe badly on an SMT host. On the
+same `plate_hole` h = 6 mm system (6 physical cores / 12 SMT threads), the
+`factor` phase measures:
+
+| `--threads` | 4 | 6 | 8 | 12 |
+|---|---:|---:|---:|---:|
+| factorize | 3.46 s | 9.70 s | 3.23 s | **102.83 s** |
+
+Using every thread costs a **30×** penalty, which is why the default
+invocation (no `--threads`) used to be the slowest one. `solve_reduced` now
+caps OpenMP to 8 threads around the direct ladder and restores the caller's
+limit afterwards, so the mesher and the stress recovery keep the full machine
+while the factorization stays off the cliff. Measured default invocation after
+the cap: **31.6 s total, 4.20 s factorize, 1.30 GiB peak** — and the answer is
+unchanged from the 4-thread run to 1.7e-12 relative to the field scale.
+
+### 6.2 Where the rest of the time went
+
+Three costs dominated a CLI solve and none of them was the mathematics:
+
+- **A quadratic `reserve` in the preflight.** `free_dof_pattern` appended one
+  `Eigen::Triplet` per local (row, col) pair *and* called
+  `entries.reserve(entries.size() + local.size() * local.size())` inside the
+  element loop. Reserving exactly the new size defeats geometric growth:
+  capacity rose by one element's worth per iteration, so every element
+  reallocated and copied the whole buffer. On `smoke_bar` at h = 20 mm (6,144
+  tet10 cells, 26,640 free DOF) that one line was **183 s of a 187 s run**; the
+  same pattern now builds in 0.02 s by counting straight into compressed
+  storage. This is the real source of the "hours at h ≤ 8 mm" report — the cost
+  is quadratic in element count, so it grows far faster than the solve it was
+  sizing.
+- **A discarded solve.** The default CAD path solved the mesh twice: once
+  linear, then again on the promoted curved-quadratic mesh, whose answer is the
+  only one reported. The first solve and its ZZ recovery exist to pick
+  p-elevation targets and to drive `--adapt`; with unconditional promotion and
+  no adaptive pass, nothing ever read them. `solve` now reports `solves=1` for
+  that case.
+- **Triplet lists everywhere.** Global assembly built one 16-byte triplet per
+  local entry — 750 MB on a 52k-cell tet10 mesh, twice over during the thread
+  merge, plus a counting sort — and the Dirichlet reduction built a second
+  triplet list for a matrix whose rows were already sorted per column. Both now
+  write into a pattern computed from connectivity: `assemble_stiffness` builds
+  the node adjacency, expands it to 3×3 blocks, and accumulates element
+  matrices in place; the reduction is a selection copied column by column.
+
+### 6.3 Chunked parallel, serial scatter
+
+Element matrices are computed one **chunk** at a time in parallel into a bounded
+32 MB scratch buffer, then scattered **serially in element order**. Peak scratch
+is one chunk instead of one dense matrix per element, and every matrix entry is
+summed in element order regardless of thread count — so the assembled K is
+bit-for-bit identical on any host, and identical to what the previous triplet
+merge produced, since that merge also summed in element order. ZZ recovery's
+node→element incidence is compressed the same way (one allocation instead of
+one `std::vector` per node), with patches ordered exactly as before so the
+order-sensitive patch mean and least-squares fit are unchanged.
+
+### 6.4 Reproduce
+
+```sh
+# the phase table and peak RSS for one solve
+./build/apps/cli/polymesh solve tests/fixtures/parts/plate_hole.step \
+    -o /tmp/plate_h6.vtu -h 0.006 --threads 4
+
+# the same solve on the simplicial rung (row 2 of the table above)
+POLYMESH_FEA_DIRECT=ldlt ./build/apps/cli/polymesh solve \
+    tests/fixtures/parts/plate_hole.step -o /tmp/plate_h6_ldlt.vtu -h 0.006 --threads 4
+
+# force the iterative path
+./build/apps/cli/polymesh solve tests/fixtures/parts/plate_hole.step \
+    -o /tmp/plate_h6_cg.vtu -h 0.006 --threads 4 --solver cg
+```
+
+### 6.5 What is still expensive
+
+After the above, meshing is the largest phase of a CLI solve, not solving:
+24.8 s of `plate_hole` h = 6 mm's 40.4 s. A `perf` profile of `polymesh mesh`
+on that case attributes **29.6%** of the command to
+`pipeline::conform_true_exterior` — the ADR-0035 boundary-conformance gate,
+whose own note reports `edge_pass=10423 ms` — with
+`fea::element_jacobians_positive` (19.8% inclusive) as its inner loop, since the
+gate re-validates every incident cell for each candidate node move. That is the
+next lever, and it is a correctness-critical stage: it is left alone here rather
+than optimised without a conformance gate to defend it.

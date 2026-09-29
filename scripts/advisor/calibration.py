@@ -7,7 +7,7 @@
 Three things the advisor claims but has never measured.
 
 **1. The feasibility head's probabilities.** ``failure_auc`` is the only number
-reported today (``train.py:103``), and AUC is threshold-free: it says the head
+reported today (``losses.py:METRIC_KEYS``), and AUC is threshold-free: it says the head
 ranks failures above successes, and says nothing about whether ``0.5`` is the
 right place to cut or whether ``p=0.9`` means anything like 90 %. This computes
 a reliability curve, expected calibration error and a Brier score, then picks
@@ -25,7 +25,7 @@ then the model cannot tell the candidates apart.
 **3. A real out-of-distribution score.** ADR-0027 §8 promises OOD detection "by
 feature-space distance to the training manifold and by regressor interval
 width". Neither exists. What ships is ``sigmoid(failure_logit) > 0.5``
-(``src/advisor/src/advisor.cpp:437``), which detects *predicted solver failure*
+(``Advisor::decide``, ``src/advisor/src/advisor_decide.cpp``), which detects *predicted solver failure*
 — a different event from "this part is unlike anything I trained on". The
 M-A1 log records the two being conflated: an unseen part returned
 ``predicted_dof = 1.5e15`` and was caught by the feasibility head, which the log
@@ -57,17 +57,16 @@ if __package__ in (None, ""):  # direct invocation
 from . import regret as R  # noqa: E402
 from .crossval import train_fold  # noqa: E402
 from .dataset import (  # noqa: E402
-    ADVISOR_DIR,
     FEATURE_COLUMNS,
     GEOMETRY_FEATURE_COLUMNS,
-    INPUT_COLUMNS,
     SPLIT_MODES,
     AdvisorData,
-    group_of,
     load_dataset,
     provenance,
     split_groups,
 )
+from .features import BC_REGION_COLUMNS, MATERIAL_COLUMNS  # noqa: E402
+from .paths import ADVISOR_DIR  # noqa: E402
 
 REPORT_JSON = ADVISOR_DIR / "calibration.json"
 OOD_JSON = ADVISOR_DIR / "ood.json"
@@ -216,11 +215,7 @@ def conformal_report(residual_calibration: np.ndarray, residual_test: np.ndarray
 #: Excluding them costs no detection power: leave-one-family-out over 8 folds
 #: gives 100.0% held-out-family detection (min 100.0%) either way, and the
 #: in-sample false-alarm rate actually improves from 0.92% to 0.86%.
-BC_FEATURE_COLUMNS: list[str] = [
-    "n_fix_faces", "n_load_faces", "fix_area_frac", "load_area_frac",
-    "load_dir_x", "load_dir_y", "load_dir_z", "fix_load_dist_over_diag",
-    "load_axis_alignment", "poisson",
-]
+BC_FEATURE_COLUMNS: list[str] = BC_REGION_COLUMNS + MATERIAL_COLUMNS
 
 #: The part-geometry columns the OOD test is fitted over: the campaign's
 #: mesh-derived geometry features plus the 15 exact-BRep descriptors.

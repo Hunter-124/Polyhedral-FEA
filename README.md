@@ -142,7 +142,7 @@ Every number below comes from a committed artifact in this repository.
 | L-domain re-entrant corner | energy-gap convergence order | 1.265 vs theory 2λ = 1.089 | ±0.35 |
 
 Sources: [convergence report](bench/reports/p1-gate1-convergence.md),
-[docs/ROADMAP.md](docs/ROADMAP.md). Setup rationale:
+[docs/STATUS.md](docs/STATUS.md). Setup rationale:
 [ADR-0009](docs/decisions/0009-tier1-verification-setups.md).
 
 ### What adaptivity buys
@@ -331,9 +331,9 @@ $CLI solve $BOX -o /tmp/box_result.vtu             # fix min-x, load +Fy on max-
 $CLI solve $BOX --mesher graded --adapt 3 --eta-target 0.05 -o /tmp/adapt.vtu
 ```
 
-Run `$CLI` with no arguments for the full help. Meshers, sizing, boundary
-conditions, resource limits and build options are documented in
-[docs/cli.md](docs/cli.md).
+Run `$CLI` with no arguments for the full help. Per-command flags are in
+[docs/cli.md](docs/cli.md); meshers, sizing, boundary conditions, resource
+limits and build options are in [docs/reference.md](docs/reference.md).
 
 ![PolyMesh Studio](docs/assets/showcase/gui_studio.png)
 

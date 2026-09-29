@@ -42,9 +42,11 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-RUN_BATCH = ROOT / "scripts" / "advisor" / "run_batch.py"
-CAMPAIGNS = ROOT / "bench" / "campaigns"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from advisor.paths import CAMPAIGNS_DIR, REPO_ROOT  # noqa: E402
+from advisor.run_batch import HOST_TAG, OMP_THREADS_PER_SHARD, SHARDS  # noqa: E402
+
+RUN_BATCH = REPO_ROOT / "scripts" / "advisor" / "run_batch.py"
 
 # (batch number, template, parts glob or None to use the template's own parts)
 #
@@ -85,19 +87,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--parts-glob", default=None,
                         help="repo-relative glob of case jsons, overriding every stage's "
                              "own parts. This is how two machines split one regeneration")
-    parser.add_argument("--host-tag", default="",
+    parser.add_argument("--host-tag", default=HOST_TAG,
                         help="campaign directory suffix, so two machines writing into the "
                              "same repo cannot collide (passed through to run_batch)")
     parser.add_argument("--skip-truth", action="store_true",
                         help="another host in this regeneration owns the truth campaign")
-    parser.add_argument("--shards", type=int, default=4)
-    parser.add_argument("--omp-threads", type=int, default=2)
+    parser.add_argument("--shards", type=int, default=SHARDS)
+    parser.add_argument("--omp-threads", type=int, default=OMP_THREADS_PER_SHARD)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--from-stage", type=int, default=1,
                         help="skip stages with a batch number below this")
     args = parser.parse_args(argv)
 
-    archive = CAMPAIGNS / f"archive-{args.archive}"
+    archive = CAMPAIGNS_DIR / f"archive-{args.archive}"
     if not archive.is_dir():
         raise SystemExit(
             f"{archive} absent: the retired generation must be moved out of the "
@@ -110,12 +112,12 @@ def main(argv: list[str] | None = None) -> int:
         if batch < args.from_stage:
             print(f"=== stage {batch}: skipped")
             continue
-        if not (ROOT / template).is_file():
+        if not (REPO_ROOT / template).is_file():
             raise SystemExit(f"stage {batch}: template not found: {template}")
         print(f"=== stage {batch}: {template}", flush=True)
         code = subprocess.run(
             stage_argv(batch, template, parts_glob, args),
-            cwd=str(ROOT), check=False,
+            cwd=str(REPO_ROOT), check=False,
         ).returncode
         if code != 0:
             print(f"=== stage {batch} exited {code}; stopping", flush=True)

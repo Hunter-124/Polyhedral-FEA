@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""Export static advisor figures to docs/advisor/figures/.
+"""Export the advisor training-curve figure to docs/advisor/figures/.
 
-Committed README assets, regenerated from the real training artifacts:
+Committed README asset, regenerated from the real training artifacts:
 
   training_curves.png  how far off the error prediction lands after each pass
                        through the training data — on parts the net trained on
                        and on parts it has never seen — first vs latest run
                        (runs/<NNN>/metrics.json)
 
-What the network does with a case is no longer a still: the activation heatmap
-this script used to write was replaced by `docs/assets/cinema/`, a recording of
-the deployed graph's own trunk taps firing over the real candidate enumeration
-beside the mesher building the mesh it chose (`scripts/render_cinema.py`,
-ADR-0042). A per-row-normalised heatmap of one canonical input could show which
-units were warm; it could not show which candidate a unit was warm *for*, or
-that the action it argued for is the one the mesher then executed.
+The network's activations are shown by the cinema recording in
+`docs/assets/cinema/` (`scripts/render_cinema.py`, ADR-0042), not here.
 
 Missing inputs skip the affected figure with a printed "no data yet" note —
 the script still exits 0 so it is safe to run before any training exists.
@@ -36,10 +31,9 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import figstyle as fs  # noqa: E402
+from advisor.paths import ADVISOR_DIR, REPO_ROOT  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[2]
-ADVISOR_DIR = ROOT / "bench" / "advisor"
-FIGURES_DIR = ROOT / "docs" / "advisor" / "figures"
+FIGURES_DIR = REPO_ROOT / "docs" / "advisor" / "figures"
 
 
 def parse_args() -> argparse.Namespace:

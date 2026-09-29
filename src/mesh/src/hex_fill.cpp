@@ -25,12 +25,10 @@ namespace {
 /// and a hex has no conformity-free decomposition to escape into (unlike the
 /// folded pyramids in the hybrid path, which ship as the two tets the assembly
 /// already builds from them). Gating on the corner measure here buys shape by
-/// abandoning the wall: measured 2026-08-15, M1max went 0.0007 -> 0.108 on the
-/// sphere at h=0.15*extent and 9.6e-12 -> 2.559 on the hole plate at
-/// h=0.10*extent -- half a cell off the surface -- because on a stair-stepped
-/// lattice the nodes doing the snapping ARE the nodes of the folded cells.
-/// The interior relaxation below is what actually improves their shape, and it
-/// costs no fidelity.
+/// abandoning the wall, because on a stair-stepped lattice the nodes doing the
+/// snapping ARE the nodes of the folded cells (ADR-0033 §3). The interior
+/// relaxation below is what actually improves their shape, and it costs no
+/// fidelity.
 bool hex_bad(const std::array<std::uint32_t, 8>& hx,
              const std::vector<Eigen::Vector3d>& nodes) {
     std::array<Eigen::Vector3d, 8> x{};
@@ -126,9 +124,7 @@ HexFillOutput hex_fill_surface(const geom::TriSurface& surface,
         // A cube lattice cannot reach a curved or slanted wall without folding a
         // stair-step cell if only the wall may move: the nodes doing the snapping
         // ARE the nodes of the folded cells, so a validity gate on its own does
-        // not remove the fold, it removes the snap. Measured 2026-08-15 with the
-        // gate alone: M1max 0.0007 -> 0.108 (sphere h=0.15·extent) and 9.6e-12 ->
-        // 2.559 (hole plate h=0.10·extent), i.e. half a cell off the surface.
+        // not remove the fold, it removes the snap (ADR-0033 §3).
         //
         // Giving the INTERIOR room fixes it at the source: each non-boundary node
         // moves toward the centroid of its lattice neighbours, the move is kept
@@ -254,7 +250,7 @@ HexFillOutput hex_fill_surface(const geom::TriSurface& surface,
         };
 
         // Two rounds: snap what the lattice allows, open the interior, snap the
-        // stragglers into the new space. A third round moved nothing measurable.
+        // stragglers into the new space.
         mesh::BoundaryProjectionContext* projection =
             fit != nullptr ? fit->projection : nullptr;
         out.boundary_max_distance =

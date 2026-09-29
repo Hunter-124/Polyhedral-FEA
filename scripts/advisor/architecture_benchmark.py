@@ -27,9 +27,9 @@ if __package__ in (None, ""):
     __package__ = "advisor"
 
 from .dataset import ACCURACY_HEADS, COST_HEADS, REGRESSION_HEADS, load_dataset
+from .losses import (BatchView, PolicyObjective, SplitTensors, compute_loss,
+                     evaluate)
 from .model import AdvisorNet
-from .train import (BatchView, PolicyObjective, SplitTensors, compute_loss,
-                    evaluate)
 
 BRANCH_WIDTHS = {"accuracy": 12, "geometry": 12, "cost": 16, "feasibility": 8}
 

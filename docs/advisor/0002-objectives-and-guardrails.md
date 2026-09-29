@@ -1,16 +1,18 @@
 # 0002 — Objectives and guardrails
 
-Status: implemented (2026-08-10). Companion to
+Status: implemented (2026-08-10); weights, clamps and thresholds below are the
+current values in `bench/advisor/{weights,clamps}.json` from the portable-cost
+cycle ([0012](0012-portable-cost-retrain.md)). Companion to
 [0001 — architecture](0001-architecture.md) and
-[0003 — training log](0003-training-log.md).
+[0003 — training log](0003-training-log.md) (historical).
 
 ## Why the objectives are separate
 
 The heads are trained with **per-head losses and explicit weights**, never one
-collapsed scalar. Accuracy, geometric fidelity, DOF, meshing time, solve time
-and feasibility are not commensurable; adding them with fixed coefficients bakes
-an exchange rate into the model that nobody can later inspect or change. Keeping
-them separate means the weight vector is a readable configuration file
+collapsed scalar. Accuracy, geometric fidelity, portable cost and feasibility
+are not commensurable; adding them with fixed coefficients bakes an exchange
+rate into the model that nobody can later inspect or change. Keeping them
+separate means the weight vector is a readable configuration file
 (`bench/advisor/weights.json`) and the dashboard can show each head's validation
 metric moving on its own axis.
 
@@ -40,13 +42,16 @@ never imputed into a target.
 ## Staged curriculum
 
 **Stage A** — accuracy and feasibility only. Nonzero weights: `rel_err`,
-`geo_chamfer`, `geo_p99`, `failure`, `policy`. The cost heads are switched off
-entirely. A model that has not yet learned *whether a mesh is right* has no
-business trading accuracy against milliseconds.
+`rel_err_rel`, `geo_chamfer`, `geo_p99`, `failure`, `policy`. The cost heads are
+switched off entirely. A model that has not yet learned *whether a mesh is right*
+has no business trading accuracy against cost.
 
-**Stage B** — cost blended in. `dof`, `mesh_ms` and `solve_ms` ramp linearly
-from 0 to their target weight over 5 training runs, so the trunk is not yanked
-by three new gradients arriving at full strength in one step.
+**Stage B** — cost blended in. The portable cost heads `solve_flops`,
+`solve_bytes` and `mesh_work` ramp linearly from 0 to their `stage_b_targets`
+weight over 5 training runs, so the trunk is not yanked by three new gradients
+arriving at full strength in one step. The host-dependent `dof`, `mesh_ms` and
+`solve_ms` heads are still exported but carry weight 0 in both stages
+([0012](0012-portable-cost-retrain.md): host wall time is not an objective).
 
 **The transition is detected, not scheduled.** Stage A -> B fires when the
 relative improvement of the validation `rel_err_mae` over the last 10 runs is
@@ -102,12 +107,16 @@ and C++. Nothing in the clamp table is duplicated as a C++ constant.
 
 | Dimension | Box |
 | --- | --- |
-| cell size, as a fraction of the part (`h_rel`) | [0.005, 0.2] |
+| cell size, as a fraction of the part (`h_rel`) | [0.005, 0.28] |
 | error target (`eta_target`) | [0.0, 0.3] |
 | refinement passes (`adapt_passes`) | [0, 6] |
-| element order (`order`) | one of `order_choices` (argmax over logits) |
-| quadratic elements (`p_elevate`) | {false, true} (logit sign) |
+| element order (`order`) | one of `order_choices` = `[1, 2]` (argmax over logits) |
 | mesher | one of `mesher_choices` (argmax over logits) |
+
+The `h_rel` ceiling was raised from 0.20 to 0.28 in the portable-cost cycle
+because the measured campaign included h_rel = 0.28
+([0012](0012-portable-cost-retrain.md#training-and-shipped-graph)). There is no
+`p_elevate` dimension: `order >= 2` is the same actuator.
 
 Two corrections to the planned table, both forced by the codebase:
 
@@ -129,45 +138,52 @@ itself would reject.
 The C++ side records whether it had to clamp (`AdvisorDecision::clamped`) and
 says so in the logged decision. Being overruled is reported, not hidden.
 
-### 3. Feasibility veto — at inference
+### 3. Gate, OOD refusal and veto — at inference
 
-`failure_prob = sigmoid(failure_logit)` evaluated at the **recommended** action
-(pass 2, see [0001](0001-architecture.md#two-pass-inference)). Above
-`clamps.json:veto_threshold` (0.5) the recommendation is discarded, the clamp-box
-defaults are returned, `vetoed = true` is set, and the predictions that caused
-the veto are still reported so the operator can see why.
+`failure_prob = sigmoid(failure_logit)` is used twice
+(see [0001](0001-architecture.md#inference)):
+
+- **Gate** — before ranking, candidates with `failure_prob` above
+  `clamps.json:gate_threshold` (0.05) are dropped. The key is required; the C++
+  refuses a `clamps.json` without it rather than inheriting the veto value.
+- **Veto** — after ranking, the chosen action is re-scored; above
+  `clamps.json:veto_threshold` (0.5) the recommendation is discarded.
+
+Before the veto, the OOD test in `ood.json` refuses parts unlike the training
+corpus. Every refusal returns the clamp-box defaults, sets `vetoed = true`,
+records the reason in the decision note, and suppresses the `predicted_*`
+values and `failure_prob` to NaN; only `ood_distance` is kept.
 
 ## What the tests actually prove
 
-`build/tests/polymesh_tests.exe "[advisor]"` — 152 assertions, 3 cases:
+The `[advisor]` tests (`polymesh_tests "[advisor]"`) are split across
+`tests/test_advisor_config.cpp` (model directory, `gate_threshold`, `ood.json`),
+`test_advisor_inference.cpp` (head parity, latency, descriptor dump),
+`test_advisor_explain.cpp` (activation taps, explain) and
+`test_advisor_guardrails.cpp` (gated enumeration, veto, `max_dof` budget). They
+cover, among others:
 
 - **Unusable model directory throws.** A missing model is a configuration error
   the operator must see, not something to paper over with silent defaults.
+- **`gate_threshold` and `ood.json` are required.** A `clamps.json` without the
+  gate key is rejected; a missing OOD descriptor refuses rather than imputes.
 - **Parity with the exporting PyTorch graph.** The fixture
-  `tests/fixtures/advisor_tiny/` carries the graph, the normalization/clamp
-  artifacts, and PyTorch's own float64 outputs for four inputs. `evaluate`
-  applies no policy of its own, so replaying those inputs is a genuine
-  single-forward-pass comparison.
+  `tests/fixtures/advisor_tiny/` carries the graph, the normalization/clamp/OOD
+  artifacts, and PyTorch's own float64 outputs. `evaluate` applies no policy of
+  its own, so replaying those inputs is a genuine single-forward-pass
+  comparison. `advisor_explain/` does the same for the activation taps.
 
-  The tolerance is **relative**, `|onnx - torch| / max(1, |torch|) <= 1e-6`, and
-  it ships inside `parity.json` rather than being hardcoded in the test. ONNX
-  Runtime and PyTorch use different float32 GEMM kernels and accumulation
-  orders, so absolute error scales with output magnitude: the fixture's
-  `failure_logit` of +6.5 lands 4.8e-6 away in absolute terms and 3.9e-7 away in
-  relative terms. An absolute 1e-6 assertion would have been unsatisfiable and
+  The tolerance is **relative**, `|onnx - torch| / max(1, |torch|)`, and it ships
+  inside `parity.json` (currently `1e-05`) rather than being hardcoded in the
+  test. ONNX Runtime and PyTorch use different float32 GEMM kernels and
+  accumulation orders, so absolute error scales with output magnitude; an
+  absolute bound is not attainable for outputs above about 8 in magnitude and
   would have been "fixed" by loosening it until it passed.
-- **Both guardrails, on every fixture case.** The decision is inside the clamp
-  box; `clamped` matches an independently recomputed projection of the raw
-  policy; `vetoed` matches an independently recomputed
-  `sigmoid(failure_logit) > threshold` at the reconstructed pre-veto action; a
-  veto returns exactly the defaults; a non-veto returns exactly the clamped
-  policy. The four fixture cases are forced by least-squares-fitting the head
-  layer — `nominal`, `clamped_low_h_rel` (cell size 5e-4 of the part, below the
-  floor), `vetoed_failure` (logit +6.5), and `imputed_defaults` (five columns
-  omitted so the C++ impute path is what is under test) — so the guardrail
-  branches are reached by construction, not by luck.
-
-The fixture's rows carry the clamp-box default action in their action columns.
-That is load-bearing: `recommend` queries the policy head at the default action,
-so a fixture whose action columns were arbitrary would have had its forced policy
-values attached to a row the C++ never evaluates.
+- **Guardrails on every fixture case.** Gated enumeration over the fixture's
+  `candidate_grid` stays inside the clamp box and is re-derived independently of
+  the code under test; the veto returns exactly the defaults; a `max_dof` budget
+  excludes over-budget candidates. The fixture cases — `nominal`,
+  `clamped_low_h_rel`, `vetoed_failure`, `imputed_defaults` (columns omitted so
+  the C++ impute path is under test) — are forced by least-squares-fitting the
+  head layer, so the guardrail branches are reached by construction, not by
+  luck.

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Thin Lloyd restricted-CVT loop (G2 / ADR-0024 Q10 trap #4, ADR-0025).
-// Density ρ(x) = 1 / h(x)³ must use the **same** size field as N_pred.
-// Clipped cells via Geogram ConvexCell (mesh::clip / voronoi helpers).
-// Constrained (fixed) sites stay put — G3 adds OCC projection for free wall
-// sites; this node only provides the free/fixed Lloyd iteration.
+// Lloyd restricted-CVT loop on Geogram ConvexCell (ADR-0024 Q10 trap #4,
+// ADR-0025). Density ρ(x) = 1 / h(x)³ must use the **same** size field as
+// N_pred. Fixed sites stay put; OCC wall projection of free sites lives in
+// mesh/cvt_sites.hpp.
 
 #include "mesh/geogram_clip.hpp"
 

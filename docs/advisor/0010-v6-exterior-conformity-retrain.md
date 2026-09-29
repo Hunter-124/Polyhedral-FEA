@@ -1,3 +1,5 @@
+> Superseded by [0012](0012-portable-cost-retrain.md); historical record.
+
 # 0010 — The v6 corpus: the geometry objective stopped discriminating
 
 Status: **landed**, 2026-08-17. Supersedes the corpus of

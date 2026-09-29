@@ -55,13 +55,8 @@ import figstyle as fs  # noqa: E402
 
 # Type sizes come from figstyle: fs.font_px converts a type role's point size to
 # pixels for a canvas of a given width and floors it so the smallest text still
-# clears MIN_TEXT_PX once a README scales the image down.
-
-
-def theme() -> fs.Theme:
-    """The dark stage. Comparison grids sit beside the 3D renders."""
-    t = fs.theme()
-    return t if t.name == "dark" else fs.use("dark")
+# clears MIN_TEXT_PX once a README scales the image down. Comparison grids sit
+# beside the 3D renders, so they share their dark stage (fs.dark_stage).
 
 
 # ---------------------------------------------------------------------------
@@ -70,9 +65,9 @@ def theme() -> fs.Theme:
 # Spacing is a fraction of the tiled width (cols * tile width), so the 2088 px
 # three-panel grid and the 2715 px pair end up with the same rhythm.
 #
-# Measured on those two: at the old 0.004 the meshers grid got an 8 px gutter
-# and no outer margin at all, so the tiles bled off three sides of the canvas
-# and the gutter read as a seam between two touching images rather than as a
+# Measured on those two: 0.004 gives the meshers grid an 8 px gutter and no
+# outer margin at all, so the tiles bleed off three sides of the canvas and the
+# gutter reads as a seam between two touching images rather than as a
 # separation. 0.012 is 24 px there and 31 px on the grading grid -- 11 px on
 # both once a README scales them to 900 px wide.
 GUTTER_FRAC = 0.012
@@ -234,7 +229,7 @@ def _label_lines(draw: ImageDraw.ImageDraw, part: tuple[str, str, str],
     describes; split, the name is what the reader scans across the row and the
     description is what they read second.
     """
-    t = theme()
+    t = fs.dark_stage()
     name, sep, qual = part
     if not name and not qual:
         return []
@@ -359,7 +354,7 @@ class _Caption:
     def draw_rows(self, draw: ImageDraw.ImageDraw, rows: list[_Row], x: int,
                   y: int) -> int:
         """Draw rows from the top down; return the y past the last one."""
-        t = theme()
+        t = fs.dark_stage()
         for row in rows:
             if row.kind == "space":
                 y += row.height
@@ -417,7 +412,7 @@ def build_grid(
 ) -> Image.Image:
     if not images:
         raise SystemExit("make_compare_grid: no input images")
-    t = theme()
+    t = fs.dark_stage()
 
     loaded = []
     for path in images:

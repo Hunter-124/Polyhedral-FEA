@@ -21,6 +21,16 @@ Eigen::Matrix<double, Eigen::Dynamic, 3> coords_of(const NodalMesh& mesh,
     return x;
 }
 
+// A tet4's isoparametric map is affine: eval_tet4's dn is the constant
+// [-1,-1,-1; 1,0,0; 0,1,0; 0,0,1], so det J = 6*V_signed at every quadrature
+// point. Same verdict as `rule_positive` without the per-point allocation —
+// this predicate sits in the tet fill's repair/relaxation inner loop.
+bool tet4_positive(const NodalMesh& mesh, const NodalElement& element) {
+    const auto& n = element.nodes;
+    return mesh::validity::tet_signed_volume(mesh.nodes[n[0]], mesh.nodes[n[1]],
+                                             mesh.nodes[n[2]], mesh.nodes[n[3]]) > 0.0;
+}
+
 bool rule_positive(ElementType type, const Eigen::Matrix<double, Eigen::Dynamic, 3>& x) {
     for (const auto& qp : default_rule(type)) {
         const auto shape = eval_shape(type, qp.xi);
@@ -46,9 +56,7 @@ bool element_jacobians_positive(const NodalMesh& mesh, const NodalElement& eleme
     if (element.type == ElementType::kPolyVem) {
         // A polyhedral cell carries no isoparametric map, so "integrable" here
         // means the divergence-theorem volume its VEM projector integrates over
-        // is positive. Reporting these unconditionally valid is what let a
-        // repair pass move nodes freely inside a packed-poly mesh: cvt_poly's
-        // worst boundary node went from 0.503 h to 1.799 h with no gate at all.
+        // is positive (repair passes on packed-poly meshes gate on this).
         if (element.faces.empty()) {
             return false;
         }
@@ -58,6 +66,9 @@ bool element_jacobians_positive(const NodalMesh& mesh, const NodalElement& eleme
             coords.push_back(mesh.nodes[ni]);
         }
         return poly_volume(coords, element.faces) > 0.0;
+    }
+    if (element.type == ElementType::kTet4 && element.nodes.size() == 4) {
+        return tet4_positive(mesh, element);
     }
     if (element.type == ElementType::kPyramid5 && element.nodes.size() == 5) {
         // The pyramid is integrated as the two tets of the shared-face-consistent
@@ -70,12 +81,11 @@ bool element_jacobians_positive(const NodalMesh& mesh, const NodalElement& eleme
                 ? std::array<std::array<int, 4>, 2>{{{{1, 2, 3, 4}}, {{1, 3, 0, 4}}}}
                 : std::array<std::array<int, 4>, 2>{{{{0, 1, 2, 4}}, {{0, 2, 3, 4}}}};
         for (const auto& tet : split) {
-            Eigen::Matrix<double, Eigen::Dynamic, 3> x(4, 3);
-            for (std::size_t a = 0; a < 4; ++a) {
-                x.row(static_cast<Eigen::Index>(a)) =
-                    mesh.nodes[n[static_cast<std::size_t>(tet[a])]].transpose();
-            }
-            if (!rule_positive(ElementType::kTet4, x)) {
+            if (!(mesh::validity::tet_signed_volume(
+                      mesh.nodes[n[static_cast<std::size_t>(tet[0])]],
+                      mesh.nodes[n[static_cast<std::size_t>(tet[1])]],
+                      mesh.nodes[n[static_cast<std::size_t>(tet[2])]],
+                      mesh.nodes[n[static_cast<std::size_t>(tet[3])]]) > 0.0)) {
                 return false;
             }
         }

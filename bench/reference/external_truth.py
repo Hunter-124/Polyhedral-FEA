@@ -590,11 +590,11 @@ def in_box(points: np.ndarray, box) -> np.ndarray:
 
 def fixed_boundary_nodes(nodes: np.ndarray, faces: np.ndarray, fix_box) -> np.ndarray:
     """Fixture nodes: BOUNDARY nodes inside the fix box, which is what the engine
-    applies (fea::boundary_nodes_within, reached from apps/cli select_end). The
-    rule used to be "every node inside the box", and on these corpus slabs that
-    is a different problem, not a different discretisation of the same one: an
-    element whose nodes all fall inside a slab is strain-free, so the volume
-    rule embeds a rigid inclusion the engine no longer creates. Comparing a
+    applies (fea::boundary_nodes_within, reached from apps/cli select_end). A
+    rule of "every node inside the box" is, on these corpus slabs, a different
+    problem rather than a different discretisation of the same one: an element
+    whose nodes all fall inside a slab is strain-free, so the volume rule
+    embeds a rigid inclusion the engine does not create. Comparing a
     CalculiX run under one rule against a PolyMesh run under the other would
     report a mesh/solver discrepancy that is really a BC discrepancy."""
     boundary_nodes = np.unique(faces.reshape(-1))

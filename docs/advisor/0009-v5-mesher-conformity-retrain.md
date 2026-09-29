@@ -1,3 +1,5 @@
+> Superseded by [0012](0012-portable-cost-retrain.md); historical record.
+
 # 0009 — The v5 corpus: a better mesher, better predictions, and no decision win
 
 Status: measured 2026-08-17 on `hunter-pc` (gcc, Release, OCC on).

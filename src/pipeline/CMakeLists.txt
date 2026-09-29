@@ -3,8 +3,18 @@
 # No GUI/OpenGL dependencies. apps/gui and tests both consume this.
 
 add_library(polymesh_pipeline
-    src/scene.cpp
+    src/cad_pressure.cpp
+    src/case_features.cpp
+    src/curved_geometry.cpp
+    src/mesh_size.cpp
+    src/mesher_policy.cpp
+    src/model.cpp
+    src/png_encode.cpp
+    src/refinement_plan.cpp
+    src/ship_gate.cpp
+    src/solve_job.cpp
     src/surface_render.cpp
+    src/volume_mesh.cpp
 )
 add_library(polymesh::pipeline ALIAS polymesh_pipeline)
 target_include_directories(polymesh_pipeline PUBLIC include)

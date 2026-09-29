@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "geom/indicators.hpp"
 
+#include "tri_normal.hpp"
+
 #include <Eigen/Geometry>
 
 #include <algorithm>
@@ -16,18 +18,6 @@ namespace polymesh::geom {
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
-
-Eigen::Vector3d tri_normal(const TriSurface& s, std::size_t t) {
-    const auto& tri = s.triangles[t];
-    const Eigen::Vector3d ab = s.vertices[tri[1]] - s.vertices[tri[0]];
-    const Eigen::Vector3d ac = s.vertices[tri[2]] - s.vertices[tri[0]];
-    const Eigen::Vector3d n = ab.cross(ac);
-    const double len = n.norm();
-    if (len > 0.0) {
-        return Eigen::Vector3d(n / len);
-    }
-    return Eigen::Vector3d(0.0, 0.0, 1.0);
-}
 
 double tri_area(const TriSurface& s, std::size_t t) {
     const auto& tri = s.triangles[t];
@@ -108,8 +98,8 @@ VertexCurvature estimate_vertex_curvature(const TriSurface& surface) {
         if (tris.size() != 2) {
             continue; // boundary or non-manifold: no smooth turning term
         }
-        const Eigen::Vector3d n0 = tri_normal(surface, tris[0]);
-        const Eigen::Vector3d n1 = tri_normal(surface, tris[1]);
+        const Eigen::Vector3d n0 = detail::tri_normal(surface, tris[0]);
+        const Eigen::Vector3d n1 = detail::tri_normal(surface, tris[1]);
         const double c = std::clamp(n0.dot(n1), -1.0, 1.0);
         const double theta = std::acos(c); // 0 = flat
         const double elen =
@@ -215,7 +205,7 @@ VertexThickness estimate_local_thickness(const TriSurface& surface, double eps_s
     for (std::size_t t = 0; t < surface.triangles.size(); ++t) {
         const auto& tri = surface.triangles[t];
         const double a = tri_area(surface, t);
-        const Eigen::Vector3d n = tri_normal(surface, t);
+        const Eigen::Vector3d n = detail::tri_normal(surface, t);
         for (int k = 0; k < 3; ++k) {
             vnormal[tri[static_cast<std::size_t>(k)]] += a * n;
             const auto i0 = tri[static_cast<std::size_t>(k)];

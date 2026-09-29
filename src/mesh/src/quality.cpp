@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/quality.hpp"
+#include "mesh/cell_validity.hpp"
+
+#include "topology_keys.hpp"
 
 #include <Eigen/Geometry>
 
@@ -11,47 +14,27 @@
 #include <map>
 
 namespace polymesh::mesh {
-namespace {
-
-double tet_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const Eigen::Vector3d& c,
-                  const Eigen::Vector3d& d) {
-    return (b - a).dot((c - a).cross(d - a)) / 6.0;
-}
-
-// Canonical face key: sorted node triple.
-using FaceKey = std::array<std::uint32_t, 3>;
-
-FaceKey make_face_key(std::uint32_t a, std::uint32_t b, std::uint32_t c) {
-    FaceKey f{{a, b, c}};
-    if (f[0] > f[1]) {
-        std::swap(f[0], f[1]);
-    }
-    if (f[1] > f[2]) {
-        std::swap(f[1], f[2]);
-    }
-    if (f[0] > f[1]) {
-        std::swap(f[0], f[1]);
-    }
-    return f;
-}
-
-} // namespace
 
 double tet4_aspect_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                            const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    const double v = std::abs(tet_volume(a, b, c, d));
+    const double v = std::abs(validity::tet_signed_volume(a, b, c, d));
     if (v <= 0.0) {
         return 0.0;
     }
-    const std::array<double, 6> e{(a - b).norm(), (a - c).norm(), (a - d).norm(),
-                                  (b - c).norm(), (b - d).norm(), (c - d).norm()};
-    const double emax = *std::max_element(e.begin(), e.end());
-    if (emax <= 0.0) {
+    // Only the LONGEST edge is used, so compare SQUARED lengths and take the one
+    // square root at the end: l_max^3 = (l_max^2)^(3/2) = e2max * sqrt(e2max).
+    // Hot path: the exterior-conform pass evaluates a node's whole star before
+    // and after every candidate move.
+    const std::array<double, 6> e2{(a - b).squaredNorm(), (a - c).squaredNorm(),
+                                   (a - d).squaredNorm(), (b - c).squaredNorm(),
+                                   (b - d).squaredNorm(), (c - d).squaredNorm()};
+    const double e2max = *std::max_element(e2.begin(), e2.end());
+    if (e2max <= 0.0) {
         return 0.0;
     }
     // 6√2 V / l_max³ = 1 for the regular tet.
     constexpr double kNorm = 6.0 * 1.4142135623730951;
-    return std::min(1.0, kNorm * v / (emax * emax * emax));
+    return std::min(1.0, kNorm * v / (e2max * std::sqrt(e2max)));
 }
 
 double polygon_corner_quality(const Eigen::Vector3d& prev, const Eigen::Vector3d& corner,
@@ -93,8 +76,8 @@ TetQuality summarize_tet4_quality(const std::vector<Eigen::Vector3d>& nodes,
     q.min_aspect = std::numeric_limits<double>::infinity();
     double aspect_sum = 0.0;
     for (const auto& t : tets) {
-        const double vol =
-            std::abs(tet_volume(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]));
+        const double vol = std::abs(
+            validity::tet_signed_volume(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]));
         const double asp =
             tet4_aspect_quality(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]);
         q.min_volume = std::min(q.min_volume, vol);
@@ -117,13 +100,12 @@ FaceConformityStats
 tet4_face_conformity(const std::vector<std::array<std::uint32_t, 4>>& tets) {
     FaceConformityStats s;
     s.n_tet_faces = tets.size() * 4;
-    std::map<FaceKey, int> counts;
-    static constexpr int kFaceVerts[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    std::map<detail::TriKey, int> counts;
     for (const auto& t : tets) {
-        for (const auto& fv : kFaceVerts) {
-            const FaceKey key = make_face_key(t[static_cast<std::size_t>(fv[0])],
-                                              t[static_cast<std::size_t>(fv[1])],
-                                              t[static_cast<std::size_t>(fv[2])]);
+        for (const auto& fv : detail::kTetFaces) {
+            const detail::TriKey key = detail::sorted_tri_key(
+                t[static_cast<std::size_t>(fv[0])], t[static_cast<std::size_t>(fv[1])],
+                t[static_cast<std::size_t>(fv[2])]);
             ++counts[key];
         }
     }
@@ -150,14 +132,13 @@ FaceConformityStats tet4_face_conformity(const std::vector<Eigen::Vector3d>& nod
                                          double surface_margin) {
     FaceConformityStats s;
     s.n_tet_faces = tets.size() * 4;
-    std::map<FaceKey, std::pair<int, Eigen::Vector3d>> faces;
-    static constexpr int kFaceVerts[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    std::map<detail::TriKey, std::pair<int, Eigen::Vector3d>> faces;
     for (const auto& t : tets) {
-        for (const auto& fv : kFaceVerts) {
+        for (const auto& fv : detail::kTetFaces) {
             const std::uint32_t a = t[static_cast<std::size_t>(fv[0])];
             const std::uint32_t b = t[static_cast<std::size_t>(fv[1])];
             const std::uint32_t c = t[static_cast<std::size_t>(fv[2])];
-            const FaceKey key = make_face_key(a, b, c);
+            const detail::TriKey key = detail::sorted_tri_key(a, b, c);
             auto& entry = faces[key];
             if (entry.first == 0) {
                 entry.second = (nodes[a] + nodes[b] + nodes[c]) / 3.0;

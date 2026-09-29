@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/grid_classify.hpp"
+#include "mesh/fill_progress.hpp"
+#include <atomic>
+#include <exception>
+#include <thread>
 
 #include "mesh/poly_mesh.hpp"
 #include <Eigen/Geometry>
@@ -68,18 +72,36 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
     const int nj = n_axis[a1];
     const int nk = n_axis[ray_axis];
 
-    // Parallel over plane rows: each (i,j) owns a disjoint set of cells along the ray.
-#if defined(POLYMESH_WITH_OPENMP)
-#pragma omp parallel for schedule(dynamic, 4)
-#endif
-    for (int j = 0; j < nj; ++j) {
+    std::atomic<std::size_t> completed{0};
+    std::atomic<bool> observer_failed{false};
+    std::exception_ptr observer_error;
+    const auto poll_observed = [&] {
+        // Only the caller's thread-local scope is installed. Workers never
+        // call the consumer, and a consumer exception never crosses OpenMP.
+        if (active_fill_progress == nullptr || observer_failed.load(std::memory_order_relaxed))
+            return;
+        try {
+            fill_progress_poll(completed.load(std::memory_order_relaxed), inside.size());
+        } catch (...) {
+            observer_error = std::current_exception();
+            observer_failed.store(true, std::memory_order_relaxed);
+        }
+    };
+    const auto classify_row = [&]<bool Observe>(int j) {
         for (int i = 0; i < ni; ++i) {
+            if constexpr (Observe) {
+                if (observer_failed.load(std::memory_order_relaxed))
+                    return;
+                poll_observed();
+            }
             const double c0 = grid.origin[a0] + (static_cast<double>(i) + 0.5) * grid.cell[a0];
             const double c1 = grid.origin[a1] + (static_cast<double>(j) + 0.5) * grid.cell[a1];
 
             std::vector<double> crossings;
             crossings.reserve(surface.triangles.size() / 8 + 4);
             for (const auto& tri : surface.triangles) {
+                if constexpr (Observe)
+                    poll_observed();
                 const Eigen::Vector3d& A = surface.vertices[tri[0]];
                 const Eigen::Vector3d& B = surface.vertices[tri[1]];
                 const Eigen::Vector3d& C = surface.vertices[tri[2]];
@@ -119,7 +141,41 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
                 *comps[ray_axis] = k;
                 inside[grid.index(ix, iy, iz)] = 1;
             }
+            if constexpr (Observe)
+                completed.fetch_add(nk, std::memory_order_relaxed);
         }
+    };
+    if (active_fill_progress != nullptr) {
+#if defined(POLYMESH_WITH_OPENMP)
+        std::atomic<int> workers_done{0};
+#pragma omp parallel
+        {
+#pragma omp for schedule(dynamic, 4) nowait
+            for (int j = 0; j < nj; ++j)
+                classify_row.template operator()<true>(j);
+            workers_done.fetch_add(1, std::memory_order_release);
+            // The caller may finish its rows before a long worker row. Keep
+            // observing real completed rays while waiting for those workers.
+            if (omp_get_thread_num() == 0) {
+                while (workers_done.load(std::memory_order_acquire) < omp_get_num_threads()) {
+                    poll_observed();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                }
+            }
+        }
+#else
+        for (int j = 0; j < nj; ++j)
+            classify_row.template operator()<true>(j);
+#endif
+        if (observer_error)
+            std::rethrow_exception(observer_error);
+        fill_progress_poll(completed.load(std::memory_order_relaxed), inside.size());
+    } else {
+#if defined(POLYMESH_WITH_OPENMP)
+#pragma omp parallel for schedule(dynamic, 4)
+#endif
+        for (int j = 0; j < nj; ++j)
+            classify_row.template operator()<false>(j);
     }
     // API keeps vector<bool>; conversion is serial and cheap vs the classify.
     return std::vector<bool>(inside.begin(), inside.end());
@@ -296,6 +352,7 @@ classify_cells_feature_aware(const geom::TriSurface& surface, const Eigen::Vecto
     // origin keeps the triple products small for parts far from world zero.
     double signed_surface_volume = 0.0;
     for (const auto& tri : surface.triangles) {
+        fill_progress_poll();
         if (tri[0] >= surface.vertices.size() || tri[1] >= surface.vertices.size() ||
             tri[2] >= surface.vertices.size()) {
             continue;
@@ -314,10 +371,11 @@ classify_cells_feature_aware(const geom::TriSurface& surface, const Eigen::Vecto
 
     FeatureAwareClassification out;
     // Even cell counts (opt-in) put every bbox mid-plane on a lattice plane, as
-    // the alternating 5-tet split in mesh/lattice_split.hpp requires.
+    // the alternating Kuhn split in mesh/lattice_split.hpp requires.
     out.grid = even_cells
                    ? make_bbox_grid_even(bbox_min, bbox_max, h, /*min_cells=*/2, max_cells)
                    : make_bbox_grid(bbox_min, bbox_max, h, max_cells);
+    fill_progress_phase("classification_coarse");
     out.inside = classify_cells_inside(surface, out.grid);
     out.surface_volume = surface_volume;
     out.classified_volume =
@@ -338,13 +396,16 @@ classify_cells_feature_aware(const geom::TriSurface& surface, const Eigen::Vecto
     fine.nx = 2 * out.grid.nx;
     fine.ny = 2 * out.grid.ny;
     fine.nz = 2 * out.grid.nz;
+    fill_progress_phase("classification_fine");
     const auto fine_inside = classify_cells_inside(surface, fine);
 
+    fill_progress_phase("classification_children");
     out.child_inside_mask.assign(out.inside.size(), std::uint8_t{0});
     std::size_t n_inside_children = 0;
     for (int k = 0; k < out.grid.nz; ++k) {
         for (int j = 0; j < out.grid.ny; ++j) {
             for (int i = 0; i < out.grid.nx; ++i) {
+                fill_progress_poll(out.grid.index(i, j, k), out.inside.size());
                 std::uint8_t mask = 0;
                 for (int d = 0; d < 2; ++d) {
                     for (int b = 0; b < 2; ++b) {
@@ -399,6 +460,7 @@ CanonicalCellMap canonical_cell_map(const CartesianGrid& grid, const MirrorFrame
     for (int k = 0; k < grid.nz; ++k) {
         for (int j = 0; j < grid.ny; ++j) {
             for (int i = 0; i < grid.nx; ++i) {
+                fill_progress_poll(grid.index(i, j, k), count);
                 const int ijk[3] = {i, j, k};
                 int canonical[3] = {i, j, k};
                 std::uint8_t flipped = 0;
@@ -430,11 +492,13 @@ void symmetrise_classification(FeatureAwareClassification& classification,
     const auto count = classification.inside.size();
     const auto inside_before = classification.inside;
     for (std::size_t c = 0; c < count; ++c) {
+        fill_progress_poll(c, count);
         classification.inside[c] = inside_before[map.canonical[c]];
     }
     if (classification.coarse_inside.size() == count) {
         const auto coarse_before = classification.coarse_inside;
         for (std::size_t c = 0; c < count; ++c) {
+            fill_progress_poll(c, count);
             classification.coarse_inside[c] = coarse_before[map.canonical[c]];
         }
     }
@@ -448,6 +512,7 @@ void symmetrise_classification(FeatureAwareClassification& classification,
     std::size_t n_mixed = 0;
     std::size_t n_inside_children = 0;
     for (std::size_t c = 0; c < count; ++c) {
+        fill_progress_poll(c, count);
         const std::uint8_t source = mask_before[map.canonical[c]];
         const std::uint8_t flip = map.flipped[c];
         std::uint8_t mask = 0;

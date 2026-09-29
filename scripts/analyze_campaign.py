@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""Campaign feedback-loop analysis: Pareto frontiers + config rankings.
+"""Campaign analysis: Pareto frontiers + config rankings.
 
 Works on partial or finished campaigns. Reads:
   bench/campaigns/<name>/results.jsonl
@@ -11,7 +11,7 @@ Writes:
   bench/campaigns/<name>/PARETO.md
   bench/campaigns/<name>/PARETO.json
 
-Scoring matches apps/testlab/main.cpp scalar_score:
+Scoring matches scalar_score in apps/testlab/campaign_runner.cpp:
   s_mesh  = 1 / (1 + mesh_ms / 1000)
   s_solve = 1 / (1 + solve_ms / 1000)
   score   = w_acc * accuracy + w_mesh * s_mesh + w_solve * s_solve

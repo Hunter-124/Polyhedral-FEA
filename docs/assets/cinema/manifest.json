@@ -48,11 +48,11 @@
       "-a",
       "-s",
       "-screen 0 1920x1080x24",
-      "/home/hunter/Desktop/Polyhedral-FEA/build/apps/gui/polymesh-gui",
+      "build/apps/gui/polymesh-gui",
       "--auto",
-      "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit"
+      "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record build/cinema/frames 3600; quit"
     ],
-    "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
+    "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record build/cinema/frames 3600; quit",
     "env": {
       "POLYMESH_CINEMA_STAMP": "git 62e7920+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
     },
@@ -220,7 +220,7 @@
       "cinema: reaction region 9 fx 1772.2704 fy 754.056525 fz 2147.11649 magnitude 2884.38084",
       "cinema: reaction region 10 fx 727.729605 fy -754.056524 fz 1852.88351 magnitude 2128.70122",
       "cinema: reactions complete 1 balance_rel 5.90870806e-11 support_fx 2500 support_fy 5.28823421e-08 support_fz 4000",
-      "cinema: take /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 duration 60.0000 s",
+      "cinema: take build/cinema/frames frames 3600 fps 60 duration 60.0000 s",
       "cinema: act skeleton frames 0..647 t 0.0000..10.8000 s",
       "cinema: act deliberate frames 648..1115 t 10.8000..18.6000 s",
       "cinema: act build frames 1116..1728 t 18.6000..28.8000 s",
@@ -229,7 +229,7 @@
       "cinema: mesh_stage index 0 pass 0 id fill elements 40170 nodes 9796",
       "cinema: mesh_stage index 1 pass 0 id ship elements 40170 nodes 9796",
       "cinema: solve_stage index 0 pass 0 elements 40170 nodes 9796 dof 29388 global_eta 0.297684119 h_mark 165 p_mark 38916 shape_mark 0",
-      "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 candidates 108 stages 2 elements 40170 nodes 9796 dof 29388 quality_min 0.0200003155 quality_mean 0.249598405 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 202485998 stress_p99_pa 108823023 global_eta 0.297684119 error_p99 0.00362034091 max_displacement_m 0.00119835874 deform_scale 16.7515713 visible_displacement_m 0.0200743919 visible_fraction 0.04 unchanged 0 removed 0 added 0 poster 143 width 1920 height 1080 skipped 0 solve_stages 1 solver direct_ldlt"
+      "cinema: record build/cinema/frames frames 3600 fps 60 candidates 108 stages 2 elements 40170 nodes 9796 dof 29388 quality_min 0.0200003155 quality_mean 0.249598405 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 202485998 stress_p99_pa 108823023 global_eta 0.297684119 error_p99 0.00362034091 max_displacement_m 0.00119835874 deform_scale 16.7515713 visible_displacement_m 0.0200743919 visible_fraction 0.04 unchanged 0 removed 0 added 0 poster 143 width 1920 height 1080 skipped 0 solve_stages 1 solver direct_ldlt"
     ]
   },
   "outputs": {

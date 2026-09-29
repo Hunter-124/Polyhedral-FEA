@@ -9,8 +9,27 @@
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace polymesh::adapt {
+namespace {
+
+/// Hash-grid cell coordinate of `v` along one axis, clamped into [0, n).
+std::int32_t cell_coord(double v, double origin, double inv_cell, std::int32_t n) {
+    std::int32_t i = static_cast<std::int32_t>(std::floor((v - origin) * inv_cell));
+    return i < 0 ? 0 : (i >= n ? n - 1 : i);
+}
+
+/// x-fastest flat index of hash-grid cell (ix, iy, iz) in an nx * ny * nz grid.
+std::size_t cell_offset(std::int32_t ix, std::int32_t iy, std::int32_t iz, std::int32_t nx,
+                        std::int32_t ny) {
+    return (static_cast<std::size_t>(iz) * static_cast<std::size_t>(ny) +
+            static_cast<std::size_t>(iy)) *
+               static_cast<std::size_t>(nx) +
+           static_cast<std::size_t>(ix);
+}
+
+} // namespace
 
 GradedSizing::GradedSizing(std::vector<SizeSource> sources, double h_min, double h_max,
                            double beta)
@@ -59,17 +78,10 @@ void GradedSizing::build_grid() {
                                static_cast<std::size_t>(grid_ny_) *
                                static_cast<std::size_t>(grid_nz_);
     auto bucket = [&](const Eigen::Vector3d& p) -> std::size_t {
-        auto ci = [&](double v, double o, std::int32_t n) {
-            std::int32_t i = static_cast<std::int32_t>(std::floor((v - o) * inv));
-            return i < 0 ? 0 : (i >= n ? n - 1 : i);
-        };
-        const std::int32_t ix = ci(p.x(), grid_origin_.x(), grid_nx_);
-        const std::int32_t iy = ci(p.y(), grid_origin_.y(), grid_ny_);
-        const std::int32_t iz = ci(p.z(), grid_origin_.z(), grid_nz_);
-        return (static_cast<std::size_t>(iz) * static_cast<std::size_t>(grid_ny_) +
-                static_cast<std::size_t>(iy)) *
-                   static_cast<std::size_t>(grid_nx_) +
-               static_cast<std::size_t>(ix);
+        const std::int32_t ix = cell_coord(p.x(), grid_origin_.x(), inv, grid_nx_);
+        const std::int32_t iy = cell_coord(p.y(), grid_origin_.y(), inv, grid_ny_);
+        const std::int32_t iz = cell_coord(p.z(), grid_origin_.z(), inv, grid_nz_);
+        return cell_offset(ix, iy, iz, grid_nx_, grid_ny_);
     };
     cell_start_.assign(ncells + 1, 0);
     for (const auto& s : sources_) {
@@ -93,13 +105,9 @@ double GradedSizing::size_at(const Eigen::Vector3d& point) const {
         return h_min_;
     }
     const double inv = 1.0 / grid_cell_;
-    auto ci = [&](double v, double o, std::int32_t n) {
-        std::int32_t i = static_cast<std::int32_t>(std::floor((v - o) * inv));
-        return i < 0 ? 0 : (i >= n ? n - 1 : i);
-    };
-    const std::int32_t cx = ci(point.x(), grid_origin_.x(), grid_nx_);
-    const std::int32_t cy = ci(point.y(), grid_origin_.y(), grid_ny_);
-    const std::int32_t cz = ci(point.z(), grid_origin_.z(), grid_nz_);
+    const std::int32_t cx = cell_coord(point.x(), grid_origin_.x(), inv, grid_nx_);
+    const std::int32_t cy = cell_coord(point.y(), grid_origin_.y(), inv, grid_ny_);
+    const std::int32_t cz = cell_coord(point.z(), grid_origin_.z(), inv, grid_nz_);
     double h = h_max_;
     for (std::int32_t dz = -1; dz <= 1; ++dz) {
         const std::int32_t iz = cz + dz;
@@ -116,11 +124,7 @@ double GradedSizing::size_at(const Eigen::Vector3d& point) const {
                 if (ix < 0 || ix >= grid_nx_) {
                     continue;
                 }
-                const std::size_t c =
-                    (static_cast<std::size_t>(iz) * static_cast<std::size_t>(grid_ny_) +
-                     static_cast<std::size_t>(iy)) *
-                        static_cast<std::size_t>(grid_nx_) +
-                    static_cast<std::size_t>(ix);
+                const std::size_t c = cell_offset(ix, iy, iz, grid_nx_, grid_ny_);
                 for (std::uint32_t k = cell_start_[c]; k < cell_start_[c + 1]; ++k) {
                     const SizeSource& s = sources_[items_[k]];
                     const double cand = s.h + beta_ * (point - s.x).norm();

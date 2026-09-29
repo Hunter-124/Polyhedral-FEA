@@ -194,7 +194,7 @@ TEST_CASE("D3: mid-edge node is geometric midpoint of corners") {
 // the uniform set makes an "order 2 vs order 2" comparison a true parity run --
 // the selective set leaves a linear remainder whose size varies per case and h.
 TEST_CASE("p-elevate: uniform promotes all eligible, selective a strict subset") {
-    // Same eligibility rule as apps/cli/main.cpp: tet4 and hex8 are promotable.
+    // Same eligibility rule as apps/cli/commands_solve.cpp: tet4 and hex8 are promotable.
     const auto eligible_indices = [](const fea::NodalMesh& m) {
         std::vector<std::size_t> out;
         for (std::size_t e = 0; e < m.elements.size(); ++e) {

@@ -131,12 +131,8 @@ using RelaxNeighborhoodFn = std::function<bool(std::uint32_t node)>;
 /// star is order-dependent by construction — an earlier accepted decision
 /// decides whether a later one is legal. ADR-0032 made that order
 /// platform-independent by driving it from ascending node id or from a tet's
-/// index. Neither mirrors, so a cell and its mirror image saw different
-/// predecessor states and their accept/reject outcomes diverged. Measured on
-/// `cylinder.step` at h = 8 mm, whose tessellation is exactly mirror-symmetric:
-/// the sliver-collapse round dropped the mirrored-tet fraction from
-/// 99.83/100/100% to 98.35/96.91/98.97%, and the tangential smoothing pass then
-/// amplified that seed to 91.4/86.8/93.4%.
+/// index. Neither mirrors, so a cell and its mirror image would see different
+/// predecessor states and their accept/reject outcomes would diverge.
 ///
 /// Distance from the centre is mirror-invariant, and quantising it to 1e-9 of the
 /// bbox diagonal makes a mirror pair key bit-identically — so comparing keys is

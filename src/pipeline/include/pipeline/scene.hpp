@@ -2,7 +2,7 @@
 #pragma once
 
 // Headless study pipeline: import geometry, CAD-style face regions,
-// fixtures/loads/material/mesh settings, tet mesher, background solve.
+// fixtures/loads/material/mesh settings, volume meshers, background solve.
 // apps/gui is presentation-only and consumes this library.
 
 #include "fea/nodal_mesh.hpp"
@@ -11,6 +11,7 @@
 #include "geom/cad_model.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/hybrid_fill.hpp"
 #include "mesh/mixed_fill.hpp"
 #include "mesh/surface_project.hpp"
 
@@ -53,26 +54,19 @@ enum class VolumeMesher : int {
     kHybrid = 6,     // hex bulk + pyramid skin; FE expands hex (ADR-0012 v3)
     kOctahedral = 7, // experimental BCC octahedra → tet4 (ADR-0019)
     kHybridVem = 8,  // hex FE bulk + native poly VEM transitions (ADR-0019)
-    kVaryhedron = 9, // variable poly packing (ADR-0021); v1 edge-seed scaffold
+    kVaryhedron = 9, // variable-polyhedron packing (ADR-0021); currently exports tet4
     kCvtPoly = 10,   // restricted CVT → clipped Voronoi poly VEM (G1–G4 / M5)
 };
 
 /// Canonical name for a mesher, and the inverse. The names are the CLI's
 /// `--mesher` vocabulary and the advisor's `mesher` string, so this table is
-/// also the advisor-decision-to-setup mapping.
+/// also the advisor-decision-to-setup mapping. `mesher_name` returns the
+/// advisor spelling (the trained model's `mesher_choices` vocabulary);
+/// `mesher_from_name` also accepts every CLI alias (e.g. `hexvem`, `graded`,
+/// `hybrid`, `hybridvem`).
 ///
-/// One table, next to the enum, because the copies that grew in apps/ diverged:
-/// `apps/cli` spelled four enumerators differently from `apps/testlab`
-/// (`hexvem`/`hex_vem`, `graded`/`graded_tet`, `hybrid`/`hybrid_zoo`,
-/// `hybridvem`/`hybrid_vem`), and testlab could not even parse the `hex_vem` it
-/// emitted. `mesher_name` returns the advisor/testlab spelling, because that is
-/// what the trained model's `mesher_choices` vocabulary contains and what
-/// decision logs already record; `mesher_from_name` accepts every alias either
-/// copy ever accepted, so nothing that used to parse stops parsing.
-///
-/// An unknown name is `nullopt`. No fallback: the CLI's lenient
-/// `value_or(kGradedTet)` is what let a typo'd `--mesher` silently mesh with a
-/// mesher nobody asked for, and a caller that wants a default can say so.
+/// An unknown name is `nullopt`, never a fallback mesher: a caller that wants a
+/// default must say so.
 [[nodiscard]] std::string_view mesher_name(VolumeMesher mesher);
 [[nodiscard]] std::optional<VolumeMesher> mesher_from_name(std::string_view name);
 
@@ -126,7 +120,15 @@ struct Model {
     /// and once more in the curved promotion.
     mesh::MirrorFrame mirror;
 
-    static Model load(const std::string& path, double sharp_angle_deg = 30.0);
+    /// Import a CAD part. `scale` is a uniform factor applied to the exact
+    /// geometry immediately after the STEP/BREP read and before anything is
+    /// derived from it, so the tessellation, bbox, region growing and mirror
+    /// frame all describe the scaled part and every downstream length (h, BC
+    /// boxes, exported coordinates) is in scaled units. The library works in
+    /// metres, so a millimetre STEP is imported with `scale = 0.001`.
+    /// Must be finite and positive; 1.0 (the default) imports as authored.
+    static Model load(const std::string& path, double sharp_angle_deg = 30.0,
+                      double scale = 1.0);
 };
 
 /// A force applied to a region: total force vector in newtons.
@@ -203,27 +205,16 @@ struct SimSetup {
     /// Optional caller-supplied boundary conditions, evaluated per mesh.
     ///
     /// Empty (the default) keeps the region-based `fixtures`/`loads` selection
-    /// above, so the GUI and every existing caller are byte-identical.
-    ///
-    /// When set, the callback fully replaces that selection and is the sole
-    /// source of the Dirichlet set and the load vector. It is re-invoked after
-    /// every remesh, LEB pass, and p-elevation, because the mesh it must
-    /// select on changes each adapt pass — which is exactly why this is a
-    /// callback rather than a precomputed pair.
-    ///
-    /// Rationale: region selection fixes a whole tessellation region when any
-    /// of its triangle centroids falls in a BC box, and spreads a region
-    /// resultant over that whole region. A campaign that scores CAD-aware,
-    /// mesh-resolved BCs was therefore adapting against a different problem
-    /// than it reported. This hook lets such a caller adapt and score the
-    /// same system, and reuse `SolveResult::displacement` instead of solving
-    /// twice.
+    /// above. When set, the callback fully replaces that selection and is the
+    /// sole source of the Dirichlet set and the load vector. It is re-invoked
+    /// after every remesh, LEB pass, and p-elevation, because the mesh it must
+    /// select on changes each adapt pass. This lets a caller adapt and score
+    /// the same mesh-resolved BCs and reuse `SolveResult::displacement`.
     ///
     /// The callback must return a non-empty Dirichlet set, a non-zero load
     /// vector, and `loads.size() == 3 * mesh.nodes.size()`; otherwise the
-    /// solve fails with `fea::FeaError`. It must never silently hand back an
-    /// unconstrained or unloaded system. Throwing from the callback is
-    /// allowed and propagates as a solve failure.
+    /// solve fails with `fea::FeaError`. Throwing from the callback is allowed
+    /// and propagates as a solve failure.
     std::function<BoundaryConditions(const fea::NodalMesh&)> boundary_builder;
 };
 
@@ -252,7 +243,7 @@ struct ResolvedMeshSize {
 /// `curved_geometry` and `cad_topology` price ADR-0035 curved CAD geometry into
 /// the auto budget: a curvature-dominated BRep is filled on the half-size
 /// lattice and promoted to tet10/hex20, so auto sizing must reserve ~8× cells
-/// and ~4.4 DOF per cell instead of 3.
+/// and ~4.6 DOF per element instead of 3.
 ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
                                    double sharp_angle_deg = 30.0, std::size_t max_elems = 0,
                                    std::size_t max_dof = 0, bool curved_geometry = false,
@@ -304,15 +295,12 @@ struct CaseFeatures {
     // --- exact-BRep descriptors ------------------------------------------------
     //
     // Everything above is measured from the tessellation. These are read from
-    // the BRep, and they exist because the mesh proxies cannot answer "is this
-    // part unlike anything I was trained on".
-    //
-    // The shipped ONNX contract is the 62 columns of
-    // `bench/advisor/normalization.json:input_columns` and these geo_* columns
-    // are among them; they also feed the Mahalanobis distance in
-    // `bench/advisor/ood.json`. `geo_available` is false when the build has no
-    // OpenCASCADE or the model carries no BRep, and the advisor must then
-    // decline to run the OOD test rather than testing imputed values.
+    // the BRep. They are advisor network inputs (see
+    // `bench/advisor/normalization.json:input_columns`) and also feed the
+    // Mahalanobis distance in `bench/advisor/ood.json`. `geo_available` is false
+    // when the build has no OpenCASCADE or the model carries no BRep, and the
+    // advisor must then decline to run the OOD test rather than testing
+    // imputed values.
     bool geo_available = false;
     double geo_curved_area_frac = 0.0;
     double geo_cyl_area_frac = 0.0;
@@ -332,16 +320,11 @@ struct CaseFeatures {
 
     // --- proximity / load / singularity descriptors ---------------------------
     //
-    // Thirteen columns, in the exact order the portable-cost retrain contract
-    // fixes them, mirrored by `scripts/advisor/geometry_features.py` (the ten
-    // part-level `geo_*` ones) and listed in
-    // `scripts/advisor/dataset.py:FEATURE_COLUMNS`. Unlike the OOD-only block
-    // above these are meant as network INPUTS: they carry the proximity,
-    // load-interaction and regularity signal the v7 feature vector had no
-    // column for.
-    //
-    // Every one is scale-free: lengths are divided by the bbox diagonal, angles
-    // are radians, counts are dimensionless.
+    // Thirteen advisor input columns, in `scripts/advisor/dataset.py:
+    // FEATURE_COLUMNS` order; the ten part-level `geo_*` ones are mirrored by
+    // `scripts/advisor/geometry_features.py`. Every one is scale-free: lengths
+    // are divided by the bbox diagonal, angles are radians, counts are
+    // dimensionless.
     //
     // The defaults ARE the documented "nothing to measure" sentinels, so a
     // surface-only model, a build without OpenCASCADE, or a part with no holes
@@ -553,9 +536,7 @@ bool make_boundary_projection(
 /// `mirror` folds every mid-node projection into the canonical octant of the
 /// geometry's verified reflection symmetry (mesh/mirror.hpp), so a quadratic mid
 /// and its mirror image are projected to mirrored points and classify to the same
-/// owner. Without it the curved boundary loses the symmetry the linear one has:
-/// measured on cylinder.step at h = 8 mm, 99.89% of tet10 elements mirrored
-/// against 100% of the tet4 elements they came from.
+/// owner; without it the curved boundary loses the symmetry the linear one has.
 std::size_t
 project_quadratic_boundary_mids(fea::NodalMesh& mesh, const geom::CadModel& cad,
                                 mesh::BoundaryProjectionContext* projection, double h,
@@ -581,8 +562,8 @@ struct CurvedGeometryResult {
 CurvedGeometryResult curve_volume_geometry(const Model& model, const fea::NodalMesh& mesh,
                                            double h);
 
-/// Volume mesh from closed surface: tet4 grid fill (P2 v1) with stair-cased
-/// boundary quads for region mapping / rendering.
+/// Output of `volume_mesh`: the solver mesh plus its boundary quads for region
+/// mapping / rendering.
 struct VolumeMeshOutput {
     fea::NodalMesh mesh;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
@@ -594,6 +575,8 @@ struct VolumeMeshOutput {
     std::string mesher_note;
     /// Effective linear edge scale used by exact curved-boundary projection.
     double geometry_h = 0.0;
+    /// Background lattice floor actually imposed by the allocation budget.
+    double size_floor = 0.0;
     /// Cells still under `mesh::validity::kCellShapeFloor` after the ship gate
     /// relaxation, measured with `fea::cell_quality` on the emitted mesh.
     std::size_t n_cells_below_shape_floor = 0;
@@ -662,20 +645,23 @@ inline constexpr std::array<std::string_view, 10> kMeshStageNames{
 /// knows nothing of adapt passes; `SolveJob` stamps it. A fill that hits the
 /// element/DOF ceiling and coarsens is a second fill, so its stage indices
 /// restart at 0 after the abandoned attempt's stages.
+/// @param fill_options Lightweight live graded-fill observer, independent of
+/// on_stage mesh snapshots; forwarded unchanged through auto-h retries.
 VolumeMeshOutput
 volume_mesh(const Model& model, double h, VolumeMesher mesher = VolumeMesher::kHybrid,
             int skin_layers = 2, bool feature_refine = false,
             std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
             double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
             int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
-            const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {});
+            const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {},
+            const mesh::FillOptions& fill_options = {});
 
 /// Refresh the solved-stage assessment after the final order elevation and CAD
 /// mid-node projection. Replaces its prior mesher-note token and enforces the
 /// same egregious-error hard limit used at fill time.
 void update_solved_geometry_volume(const Model& model, VolumeMeshOutput& output);
 
-/// @deprecated name kept as alias during transition; calls volume_mesh.
+/// @deprecated Alias of `volume_mesh(model, h, VolumeMesher::kTetFill, 2)`.
 /// @param h Target edge length, metres.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);
 
@@ -801,9 +787,7 @@ class SolveJob {
     /// The copy is 72 B per node (coordinates, 3 displacements, von Mises,
     /// |u|, nodal η) plus 84 B per element (56 B NodalElement, ~20 B of node
     /// indices for a mixed hex/pyramid/tet zoo, 8 B element η) plus 16 B per
-    /// boundary quad. Measured on the sphere_box_s0_c0 hybrid-zoo mesh
-    /// (11,692 elements, 4,382 nodes, 13,146 DOF, 1,048 boundary quads):
-    /// 1,314,253 B = 1.25 MiB per pass, twice for its two passes.
+    /// boundary quad.
     std::function<void(const SolveStage&)> on_solve_stage;
 
     /// Poll intermediate volume mesh for viewport (updated after mesh / adapt
@@ -824,7 +808,6 @@ class SolveJob {
     std::thread worker_;
     SolveResult result_;
     VolumeMeshOutput mesh_only_;
-    std::string error_;
     mutable std::mutex status_mutex_;
     std::string status_;
     JobProgress progress_;
@@ -857,5 +840,20 @@ class SolveJob {
     fea::SolveOptions solve_options_with_progress(int pass, int pass_count,
                                                   std::string& note_sink);
 };
+
+} // namespace polymesh::pipeline
+
+namespace polymesh::fea {
+struct LoadRegion;
+} // namespace polymesh::fea
+
+namespace polymesh::pipeline {
+
+/// Exact BRep area of the planar CAD faces whose edge samples all lie inside
+/// `box` and whose normal satisfies |n·direction| >= fea::kSelectionNormalMinDot;
+/// nullopt when `model` has no CAD or no face matches. Lets a pressure load's
+/// resultant be pressure × BRep area instead of a coarse mesh's inscribed area.
+std::optional<double> cad_pressure_area(const Model& model, const fea::LoadRegion& box,
+                                        const Eigen::Vector3d& direction);
 
 } // namespace polymesh::pipeline

@@ -38,12 +38,9 @@ int vtk_cell_type(ElementType t) {
 }
 
 /// vtkWedge winds the base triangle so its right-hand normal points AWAY from
-/// the opposite triangle. PolyMesh's kPrism6 puts base (0,1,2) at ζ = −1, whose
-/// right-hand normal points at the top face (3,4,5) — the opposite convention,
-/// which made every exported prism inside-out (negative signed cell volume,
-/// inverted surface normals in every viewer). Reversing the winding of both
-/// triangles is export-only: the mesher's emission order and therefore FE
-/// assembly and `reference_nodes(kPrism6)` are untouched.
+/// the opposite triangle; kPrism6's base (0,1,2) at ζ = −1 points at the top
+/// face (3,4,5). Reversing both triangles on export keeps VTK cell volumes and
+/// normals positive; FE assembly and `reference_nodes(kPrism6)` are untouched.
 constexpr std::array<std::size_t, 6> kPrism6ToVtkWedge{0, 2, 1, 3, 5, 4};
 
 /// Face loops of a polyhedral cell with at least 3 distinct corners.

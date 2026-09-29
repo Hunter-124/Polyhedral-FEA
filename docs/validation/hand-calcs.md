@@ -82,7 +82,7 @@ the 288 campaign rows for this part, Spearman\((\mathrm{DOF},\,
 a maximum of 12.05 — \(\sigma_{\mathrm{vm}}^{\max} = 1.3\times10^{7}\,\mathrm{Pa}\)
 against a \(10^6\) reference. It is the same prohibition ADR-0023 and the
 cylinder section already state; smoke-bar simply predated it. `sigma_vm` is a
-**diagnostic**, and `load_metrics` (apps/testlab/main.cpp) now refuses any
+**diagnostic**, and `load_metrics` (apps/testlab/campaign_config.cpp) now refuses any
 reference that scores probe kind `max_von_mises`.
 
 ### Strain energy (primary campaign score)

@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Does the ``rel_err`` head need more capacity, or a different target?
 
-Trains the accuracy head alone at a range of widths and depths on the exact
-part-hash split ``train.py`` uses, and reports train and validation MAE for
-each, so the capacity question is answered by measurement rather than opinion.
+Trains the accuracy head alone at a range of widths and depths on the default
+family hold-out split ``train.py`` uses, and reports train and validation MAE
+for each, so the capacity question is answered by measurement rather than opinion.
 
 It fits two targets at every capacity:
 

@@ -2,9 +2,9 @@
 #pragma once
 
 // Shared Cartesian lattice + solid-angle-free ray-parity classification for
-// product grid fills (tet/hex/graded/transition/prism). Fixes the classic
-// shared-edge double-count that punched diagonal tunnels through AABB boxes
-// (and any solid whose face diagonals align with cell centres).
+// product grid fills (tet/hex/graded/transition/prism). A shared edge or face
+// diagonal between coplanar triangles counts as one crossing, so parity cannot
+// punch diagonal tunnels through AABB boxes.
 
 #include "geom/tri_surface.hpp"
 #include "mesh/mirror.hpp"
@@ -105,11 +105,11 @@ std::vector<bool> classify_cells_inside(const geom::TriSurface& surface,
 /// `max_refinement_levels == 0` returns the original centre classification.
 ///
 /// `even_cells` rounds each axis up to an even count so every bbox mid-plane
-/// falls on a lattice plane. Tet fills built on the alternating 5-tet split
-/// (mesh/lattice_split.hpp) require it — their checkerboard parity only mirrors
-/// about a plane when the cell count crossed by that plane is even. The mixed
-/// hex/pyramid fill does not: its cells are self-mirror, and its 2:1 closure was
-/// tuned on the odd-permitting lattice.
+/// falls on a lattice plane. Tet fills built on the alternating Kuhn split
+/// (mesh/lattice_split.hpp) require it — their per-cell variant parity only
+/// mirrors about a plane when the cell count crossed by that plane is even. The
+/// mixed hex/pyramid fill does not: its cells are self-mirror, and its 2:1
+/// closure was tuned on the odd-permitting lattice.
 FeatureAwareClassification classify_cells_feature_aware(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, long max_cells = kDefaultMaxGridCells,

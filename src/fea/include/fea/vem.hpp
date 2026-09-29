@@ -27,21 +27,12 @@ namespace polymesh::fea {
 /// A polyhedral cell: global node indices + oriented faces (each face is a
 /// loop of *local* indices into `nodes`, outward from the cell).
 /// For k=2, `nodes` = vertices first (indices used by `faces`), then one
-/// mid-edge node per unique undirected edge of the face graph, in the order
-/// returned by `poly_edges(faces)`.
+/// mid-edge node per unique undirected edge of the face graph, in first-seen
+/// order while walking faces in order, each face edge in loop order.
 struct PolyCell {
     std::vector<std::uint32_t> nodes;
     std::vector<std::vector<std::uint32_t>> faces; // local vertex indices
 };
-
-/// Unique undirected edges from face loops, deterministic order (first-seen
-/// while walking faces in order, each face edge in loop order). Endpoints are
-/// local vertex indices.
-std::vector<std::array<std::uint32_t, 2>>
-poly_edges(const std::vector<std::vector<std::uint32_t>>& faces);
-
-/// Number of distinct local vertex indices referenced by faces (expects 0..nv-1).
-std::size_t poly_vertex_count(const std::vector<std::vector<std::uint32_t>>& faces);
 
 /// Infer VEM order from connectivity: 1 if nodes == vertices, 2 if
 /// nodes == vertices + edges. Throws FeaError otherwise.
@@ -66,8 +57,8 @@ Eigen::MatrixXd vem_poly_stiffness(const NodalMesh& mesh, const PolyCell& cell,
 PolyCell hex8_as_poly(const NodalElement& hex);
 
 /// Convert a hex20 (vertices + mid-edges) to a k=2 PolyCell. Mid-edge nodes are
-/// reordered to match `poly_edges` of the hex faces (may differ from hex20
-/// serendipity edge order).
+/// reordered into the PolyCell k=2 edge order of the hex faces (may differ from
+/// hex20 serendipity edge order).
 PolyCell hex20_as_poly(const NodalElement& hex20);
 
 /// Convert a tet4 element to a PolyCell (4 tri faces).

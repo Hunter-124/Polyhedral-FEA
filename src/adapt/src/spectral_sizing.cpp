@@ -6,7 +6,6 @@
 #include <complex>
 #include <cstddef>
 #include <limits>
-#include <numeric>
 #include <stdexcept>
 #include <utility>
 #include <vector>

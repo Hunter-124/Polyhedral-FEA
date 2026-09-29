@@ -21,8 +21,8 @@ What this answers that ``evaluate.py`` on a single checkpoint cannot:
    side by side: ``advisor_argmin`` (enumerate the candidate actions, take the
    argmin of the predicted ``rel_err_rel`` head -- what ``evaluate.py`` has
    always reported) and ``advisor_policy`` (query the policy head once at the
-   default action, decode, clamp, argmax -- what ``src/advisor/src/advisor.cpp``
-   actually does in production).
+   default action, decode, clamp, argmax -- what ``Advisor::decide``
+   (``src/advisor/src/advisor_decide.cpp``) actually does in production).
 
 4. **Is the number stable?** Every fold is trained at several seeds and the
    spread is reported, because a mean over a dozen held-out cases from one seed
@@ -50,7 +50,6 @@ if __package__ in (None, ""):  # direct `python scripts/advisor/crossval.py`
 
 from . import regret as R  # noqa: E402
 from .dataset import (  # noqa: E402
-    ADVISOR_DIR,
     CATEGORICAL_INDEX_COLUMNS,
     CONTINUOUS_ACTION_COLUMNS,
     CONTINUOUS_ACTION_DIMS,
@@ -65,6 +64,7 @@ from .dataset import (  # noqa: E402
     split_groups,
 )
 from .model import AdvisorNet  # noqa: E402
+from .paths import ADVISOR_DIR  # noqa: E402
 from .train import (  # noqa: E402
     STAGE_A_WEIGHTS,
     PolicyObjective,
@@ -93,9 +93,9 @@ def action_matrix(split: Split, cases: list[R.Case]) -> dict[str, np.ndarray]:
 def standardized_default_action(data: AdvisorData) -> np.ndarray:
     """The clamp-box default action, standardized into input space.
 
-    Mirrors ``Impl::apply_action`` + ``Impl::encode`` in
-    ``src/advisor/src/advisor.cpp``: only the six columns the C++ side actually
-    writes are set, and every other action column keeps the imputed training
+    Mirrors ``Impl::apply_action`` (``src/advisor/src/advisor_features.cpp``) +
+    ``Impl::encode`` (``src/advisor/src/advisor_artifacts.cpp``): only the six
+    columns the C++ side actually writes are set, and every other action column keeps the imputed training
     median. That blindness is deployed behaviour, so reproducing it is the
     point -- scoring the policy with dials it never sets would flatter it.
     """
@@ -117,9 +117,9 @@ def standardized_default_action(data: AdvisorData) -> np.ndarray:
 def decode_policy(policy: np.ndarray, data: AdvisorData) -> np.ndarray:
     """Decode a policy vector into a standardized action, exactly as C++ does.
 
-    ``advisor.cpp:420-432``: three clamped continuous dims, then an argmax over
-    the order and mesher logit blocks. The policy is 3 + n_order + n_mesher
-    wide; there is no p-elevate logit to sign-test.
+    ``Advisor::decide`` (``advisor_decide.cpp``): three clamped continuous dims,
+    then an argmax over the order and mesher logit blocks. The policy is
+    3 + n_order + n_mesher wide; there is no p-elevate logit to sign-test.
     """
     mean = np.asarray(data.normalization["mean"], dtype=np.float64)
     std = np.asarray(data.normalization["std"], dtype=np.float64)
@@ -181,7 +181,7 @@ def advisor_scores(net: AdvisorNet, split: Split, cases: list[R.Case],
         fail[case.part] = failure[rows]
         abs_err[case.part] = absolute[rows]
         cost[case.part] = dof[rows]
-        # Pass 1 of advisor.cpp:recommend -- the policy is queried at the
+        # Pass 1 of Advisor::decide -- the policy is queried at the
         # default action, so the query row is this case's context with the
         # default action substituted in.
         query = split.x[rows[0]].copy()

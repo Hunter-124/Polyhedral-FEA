@@ -2,7 +2,6 @@
 #include "adapt/loop.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <stdexcept>
 
 namespace polymesh::adapt {

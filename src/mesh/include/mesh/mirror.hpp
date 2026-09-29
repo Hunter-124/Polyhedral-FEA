@@ -6,23 +6,14 @@
 //
 // The lattice tiling itself mirrors (mesh/lattice_split.hpp) and the
 // accept/reject passes order themselves on a mirror-invariant key
-// (mesh/surface_project.hpp `MirrorKeyFrame`), yet a mirror-symmetric part still
-// came out with a visibly asymmetric element pattern: measured on sphere.step at
-// h = 8 mm, only 75.4 / 95.9 / 83.1% of tets had a mirror image about the three
-// bbox mid-planes. The reason is upstream of ordering. Every decision the mesher
-// makes about *where the material is* — inside/outside parity, the child mask,
-// curvature and feature stamps, jut detection, the snap target — is read off the
-// OCC tessellation, and that tessellation is not mirror-symmetric: at the
-// product's own settings (5e-4·diag deflection, 0.2 rad) the fraction of
-// tessellation vertices with an exact mirror partner is
-//
-//   sphere      x  0.00%   y 99.69%   z  1.33%
-//   plate_hole  x  5.97%   y  100%    z  100%
-//   cylinder    x  100%    y  100%    z  100%
-//
-// A seam placed on one side of a plane, or a facet row that starts half a facet
-// further along, gives a cell and its mirror image genuinely different inputs,
-// and no amount of tie-breaking can recover a symmetry the inputs never had.
+// (mesh/surface_project.hpp `MirrorKeyFrame`), yet that is not enough: every
+// decision the mesher makes about *where the material is* — inside/outside
+// parity, the child mask, curvature and feature stamps, jut detection, the snap
+// target — is read off the OCC tessellation, and that tessellation is generally
+// not mirror-symmetric even when the solid is. A seam placed on one side of a
+// plane, or a facet row that starts half a facet further along, gives a cell
+// and its mirror image genuinely different inputs, and no amount of
+// tie-breaking can recover a symmetry the inputs never had.
 //
 // So the geometry is queried through a fold instead. When the *exact* geometry is
 // verified mirror-symmetric about a bbox mid-plane, a query point is reflected
@@ -95,10 +86,7 @@ struct MirrorFrame {
     ///
     /// A node ON a mirror plane is its own reflection, so an orbit lock imposes
     /// nothing on it — yet any motion with a component normal to the plane breaks
-    /// the symmetry by itself. Measured on plate_hole at h = 6 mm with every other
-    /// stage exact, exactly two nodes ended up off the x plane (at 0.0006 of the
-    /// extent) and cost 8 tets their mirror image; on icecream_cone the same
-    /// mechanism moved rim nodes off the plane they sat on.
+    /// the symmetry by itself.
     [[nodiscard]] Eigen::Vector3d clamp_to_planes(const Eigen::Vector3d& target,
                                                   const Eigen::Vector3d& at) const {
         Eigen::Vector3d r = target;
@@ -122,19 +110,6 @@ struct MirrorFrame {
             }
         }
         return clamp_to_planes(r, like);
-    }
-
-    /// Reflect a direction computed in the folded frame back into `like`'s
-    /// octant. Free vectors carry no origin, so only the sign flips.
-    [[nodiscard]] Eigen::Vector3d unfold_direction(const Eigen::Vector3d& v,
-                                                   const Eigen::Vector3d& like) const {
-        Eigen::Vector3d r = v;
-        for (int a = 0; a < 3; ++a) {
-            if (plane[static_cast<std::size_t>(a)] && like[a] > center[a]) {
-                r[a] = -v[a];
-            }
-        }
-        return r;
     }
 };
 
@@ -180,13 +155,10 @@ struct MirrorFrame {
 /// Reflection-orbit lookup over a mesh node array.
 ///
 /// Folding the geometry queries makes every *input* symmetric, which is
-/// necessary and not sufficient: a pass that mutates the mesh sequentially — the
-/// sliver-cap collapse is the measured case — can still take a decision on one
-/// side and find it illegal on the other, because the first decision changed the
-/// state the second is judged against. Measured on cylinder.step at h = 8 mm with
-/// every query folded, the collapse round entered at exactly 100/100/100%
-/// mirrored tets and left at 99.7/98.8/99.4%: 170 of 1880 collapses had no mirror
-/// image, all of them on the curved wall, none of them near a mid-plane.
+/// necessary and not sufficient: a pass that mutates the mesh sequentially (the
+/// sliver-cap collapse, for one) can still take a decision on one side and find
+/// it illegal on the other, because the first decision changed the state the
+/// second is judged against.
 ///
 /// The cure is to decide for a whole orbit at once, which needs the orbit: this
 /// maps a node to the node sitting at its reflected position. A missing partner

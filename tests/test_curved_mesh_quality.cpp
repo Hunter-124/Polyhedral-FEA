@@ -311,7 +311,7 @@ constexpr double kHybridKeepFraction = 0.90; // measured ≥0.941×hex (2026-08-
 // DO NOT LOOSEN kResidualFrac to make this file green. The snap-fidelity
 // regression these three assertions tracked is closed: mixed_fill.cpp now
 // places the apex of every boundary fan / expanded shell hex against the
-// *predicted* post-snap cell, so the snap's sliver floors (scene.cpp
+// *predicted* post-snap cell, so the snap's sliver floors (volume_mesh.cpp
 // kMinShape/kMinTetAspect) no longer have to buy cell shape by retreating wall
 // nodes. Measured 2026-08-08 after that fix, hybrid m1_max is 1.7e-16 @ h=0.15,
 // 0.0066 @ h=0.12 (0.055 h) and 9.6e-12 @ h=5.08, from 0.0313 (0.21 h) /

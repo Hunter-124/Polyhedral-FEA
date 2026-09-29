@@ -1,261 +1,260 @@
-# CLI and options reference
+# `polymesh` command-line reference
 
-Reference for the `polymesh` subcommands and their flags, plus the build options
-and resource limits that govern them. Running `polymesh` with no arguments
-prints the full help.
+The `polymesh` binary (`apps/cli/`: dispatcher in `main.cpp`, one `commands_*.cpp` per
+command group) is the headless face of the library: it
+imports a CAD part, meshes it, solves it, and writes VTU / PNG / JSON artifacts. It is
+also the lane external tools use as an independent cross-check of an in-process solve
+(Chudware's `polymesh_cli` MCP tool shells out to exactly this binary).
+
+```
+polymesh <command> [args]
+```
+
+`polymesh --version` (or `-V`) prints `polymesh <version>`. Meshers, sizing, resource
+limits, build options and the GUI are covered in [reference.md](reference.md).
+
+Exit codes: `0` success, `1` a thrown error (message on stderr as `error: …`), `2` bad
+usage or a rejected flag value.
+
+## Units
+
+**The solver treats every coordinate as metres**, every modulus and stress as pascals,
+and every force as newtons. Nothing in the pipeline inspects a STEP file's declared
+units, so a part authored in millimetres must be converted on import:
+
+```
+polymesh solve bracket.step --scale 0.001 -o bracket.vtu -h 0.002
+```
+
+`--scale` multiplies the exact geometry immediately after the STEP/BREP read, inside
+`pipeline::Model::load`, before the tessellation, bounding box, face regions, mirror
+frame or any mesh exist (`geom::CadModel::scaled`, an OCCT `gp_Trsf::SetScale` about the
+origin with a deep shape copy). Consequently **every other length in the invocation is
+in scaled units**: `-h`, `--fix-box` / `--load-box`, the reported bbox and h values, and
+the coordinates written into a VTU. With `--scale 0.001` a 2 mm target element size is
+`-h 0.002`, not `-h 2`.
+
+A factor of `1.0` (the default) imports the file as authored. A non-positive or
+non-finite factor is rejected with exit code 2 rather than silently treated as 1.0.
+`--scale` is not accepted for a Gmsh `.msh` input to `solve`: that input is already
+discretised, and rescaling its nodes would divorce them from the element sizes the mesh
+was built with — convert units in the mesher that wrote the file.
+
+When a factor other than 1.0 is used, the run prints one line before its other output:
+
+```
+scale: 0.001 (model units x factor)
+```
+
+## Inputs
+
+CAD: `.step`, `.stp`, `.brep`, `.brp` (a retained OCCT BRep — the geometry the mesher,
+curved promotion and fidelity checks all query). `solve` additionally accepts a Gmsh 2.x
+ASCII `.msh` volume mesh, which it solves directly without meshing. STL input is not
+supported.
 
 ## Commands
 
-`check`, `mesh`, `diag` and `render` take CAD (`.step .stp .brep .brp`); `solve`
-also accepts Gmsh `.msh`. Advisor features require CAD, so `--advisor` is
-rejected for `.msh`. Fixture:
-[`bench/geometries/public/unit_box.step`](../bench/geometries/public/unit_box.step)
-(1 m axis-aligned box).
+### `check <part> [--scale f]`
 
-```sh
-CLI="${POLYMESH_BIN:-./build/apps/cli/polymesh}"
-BOX=bench/geometries/public/unit_box.step
+Import and validate the geometry, then report vertex/triangle counts of the derived
+tessellation and whether a CAD BRep was retained. The cheapest way to prove a file is
+readable and, with `--scale`, that its converted size is what you expect.
 
-$CLI --version
+| Flag | Meaning |
+|---|---|
+| `--scale f` | uniform import scale (see [Units](#units)) |
 
-# Validate CAD geometry
-$CLI check $BOX
+### `mesh <part> [flags]`
 
-# Mesh — geometry-aware (curvature/thin-wall) grading is on by default.
-# Omit -h (or -h 0) for auto h0 from bbox + feature density; -h is in metres.
-$CLI mesh $BOX -o /tmp/box_mesh.vtu
-$CLI mesh $BOX --mesher varyhedron -h 0.1 -o /tmp/box_vary.vtu
+Geometry- and BC-aware volume mesh, optionally written as a VTU with a per-cell
+`quality` array. Prints node/element counts, the resolved `h`, the refinement-plan
+summary (geometry seeds, BC seeds, band, `h_fine`, whether curvature came from the BRep
+or the tessellation), the mesh-size note, the mesher note, and — when spectral sizing
+fired — the retained mode count and energy fraction.
 
-# Geometry + simulation-setup aware: grade toward the load box (finest) and
-# the fixture box. Both take 6 numbers: x0 y0 z0 x1 y1 z1.
-$CLI mesh $BOX --mesher varyhedron \
-  --fix-box -1 -1 -1 0.01 2 2 --load-box 0.99 -1 -1 2 2 2 \
-  -o /tmp/box_bc.vtu
+Small or curved CAD faces normally require an aligned delivered boundary patch
+(centroid distance ≤ `0.3h`, absolute normal dot product ≥ `0.5`). A face below
+the projection-collapse scale may instead be reported as
+`feature_absorbed face=… extent=… area=… scale=… distance=…`: its exact minimum
+intrinsic extent is below `0.05 × min(h, h_fine)` and its sampled surface remains
+within the same `0.3h` distance limit. Planar faces use their in-plane extent,
+not their zero thickness. This means the sub-resolution detail was absorbed,
+not that a separate aligned patch was delivered. Resolvable missing walls still
+refuse; size floors and volume-fidelity tolerances are unchanged. Values use the
+imported model's units (area uses squared units).
 
-# Solve — default BCs fix min-x and load +Fy on max-x; the boxes override
-# that selection. Writes von Mises + displacement to VTU.
-$CLI solve $BOX -o /tmp/box_result.vtu
-$CLI solve $BOX -h 0.08 --mesher tet -o /tmp/box_tet.vtu
+| Flag | Meaning |
+|---|---|
+| `-h m` | target element size in (scaled) metres; omit or `0` for auto h0 from bbox + feature density |
+| `-o out.vtu` | write the mesh (with cell quality) to this VTU |
+| `--mesher name` | mesher selection, see [Mesher names](#mesher-names); default `graded` |
+| `--skin n` | graded fine skin layers, clamped to ≥ 1 (default 2) |
+| `--no-feature` | disable geometry (curvature / thin-wall) grading, which is on by default |
+| `--feature` | accepted for back-compat; already the default |
+| `--no-spectral` | disable FFT sizing-field trimming and CAD-edge curvature denoise (ADR-0034 baseline behaviour) |
+| `--spectral` | accepted for symmetry; already the default |
+| `--no-curved` | ship the straight-edged linear mesh instead of the exact curved CAD geometry |
+| `--element-tendency t` | element-shape dial in [-1, +1] (hex ↔ fan hybrid ↔ poly VEM ↔ tet) |
+| `--max-elems N` | pre-flight element ceiling; `0` selects the 589824 default |
+| `--max-dof N` | pre-flight DOF ceiling; `0` selects the 1769472 default |
+| `--fix-box x0 y0 z0 x1 y1 z1` | fixture selection AABB; also grades the mesh finer toward it |
+| `--load-box x0 y0 z0 x1 y1 z1` | load selection AABB; graded finest |
+| `--scale f` | uniform import scale (see [Units](#units)) |
 
-# Adaptive solve: ZZ → Dörfler remesh passes until the global indicator drops.
-# η is relative (dimensionless), so --eta-target is a fraction, not a stress.
-$CLI solve $BOX --mesher graded --adapt 3 --eta-target 0.05 -o /tmp/box_adapt.vtu
+### `solve <part> -o out.vtu [flags]`
 
-# Same solve, but load the +x face with a 2 MPa pressure pointing -y
-$CLI solve $BOX --load-box 0.99 -1 -1 2 2 2 --load-dir 0 -1 0 --traction 2e6 \
-  -o /tmp/box_pressure.vtu
+CAD input: mesh, select boundary conditions, solve linear elastostatics, write the
+displacement/stress VTU. Gmsh input: solve the imported volume mesh directly. `-o` is
+required.
 
-# JSON diagnostics: directional fidelity measured against the exact live B-rep
-# (hard-bounded reverse sampling), mesh quality, per-phase timings, and η.
-$CLI diag tests/fixtures/parts/pipe.step --json /tmp/pipe.json
+Default boundary conditions clamp a slab at min-x and load a slab at max-x (see
+[Default BC selection](#default-bc-selection)); `--fix-box` / `--load-box` override that
+selection.
 
-# Headless render: rasterize the exact same boundary tessellation the Studio
-# viewport paints — no GL, no window, no Xvfb. --stats adds a numeric report
-# whose normal_deviation_deg is the facet-normal angle to the exact B-rep, so
-# `--no-curved` visibly and measurably degrades it.
-$CLI render tests/fixtures/parts/sphere.step -h 0.02 -o /tmp/sphere.png \
-  --wireframe --stats /tmp/sphere.json
+| Flag | Meaning |
+|---|---|
+| `-o out.vtu` | **required** result path |
+| `-h m` | target element size in (scaled) metres; omit or `0` for auto |
+| `-E Pa` | Young's modulus (default 200e9) |
+| `-nu r` | Poisson's ratio (default 0.3) |
+| `--mesher name` | see [Mesher names](#mesher-names); default `graded` |
+| `--skin n` | graded fine skin layers (default 2) |
+| `--no-feature` / `--feature` | disable / (default) geometry grading |
+| `--no-spectral` / `--spectral` | disable / (default) spectral sizing |
+| `--no-curved` | solve and export the straight-edged linear mesh; the CAD default is curved tet10/hex20 with boundary mids projected onto the BRep (ADR-0035), so this is the opt-out |
+| `--p-elevate` | promote to quadratic elements (already implied by the CAD default and by `--adapt`) |
+| `--p-elevate-uniform` | promote every tet4/hex8 on tessellated (non-CAD) input too, for order-2 parity with Gmsh peers; implies `--p-elevate` |
+| `--element-tendency t` | element-shape dial in [-1, +1] |
+| `--adapt n` | ZZ → Dörfler remesh passes (local seeds on the graded path); negative is clamped to 0 |
+| `--eta-target η` | stop adapting when the global ZZ indicator η is at or below this value; `0` = off, needs `--adapt` |
+| `--bc-grade` | force a-priori BC grading from the default cantilever faces |
+| `--fix-box ...6` / `--load-box ...6` | BC / load selection AABBs |
+| `--load-dir x y z` | load direction, normalized (default `0 1 0`) |
+| `--force N` | total resultant force over the loaded faces (default 1000), applied as a consistent traction ∫Nᵗt dS |
+| `--traction Pa` | pressure magnitude instead of a total force; load faces are filtered by normal alignment with `--load-dir` and the resultant is Pa × their area. The last of `--force` / `--traction` wins |
+| `--max-elems N` / `--max-dof N` | pre-flight ceilings; `0` selects the defaults |
+| `--solver auto\|direct\|cg` | linear-solver policy. `auto` (default) takes the sparse direct ladder for every system that fits the memory budget and falls back to CG only above `SolveOptions::cg_threshold` or when the estimated factor does not fit; `direct` and `cg` force one path. See [the solver ladder](solver-core.md#6-what-the-linear-solve-costs) |
+| `--threads N` | cap OpenMP parallelism for meshing, assembly and stress recovery. `0` (default) uses the process default; a value above the hardware default is clamped to it. The direct factorization additionally caps itself at 8 threads whatever this says, because CHOLMOD's OpenMP loops nest over an OpenMP BLAS ([measured](solver-core.md#61a-how-many-threads-the-factorization-gets)) |
+| `--max-mem GB` | enforced pre-flight solve cap; `0` = auto (70% of currently available memory) |
+| `--advisor DIR` | pick mesher / h / adapt / p-order with the learned mesh advisor (`DIR` holds `model.onnx`, `normalization.json`, `clamps.json`); every value is clamped and the decision is logged as JSON. CAD input only |
+| `--advisor-objective accuracy\|efficiency` | `accuracy` (default), or calibrated `efficiency`, which minimises predicted mesh+solve time inside a 5% accuracy envelope |
+| `--advisor-max-dof N` | with `--advisor`, drop candidate actions whose predicted DOF exceeds N; falls back to the defaults if none fit |
+| `--scale f` | uniform import scale, CAD input only (see [Units](#units)) |
 
-# Runtime stack: e.g. "cpu | OpenMP 16 threads | Eigen serial (no nest)"
-$CLI backend
+#### The `phases:` line
+
+Every `solve` closes with one measured line, so a slow run never has to be
+guessed at:
+
+```
+phases: import=0.13 refine=0.05 mesh=24.84 bc=0.19 preflight=2.55 assemble=0.73
+  reduce=0.16 order=2.29 factor=3.46 backsolve=0.11 stress=0.09 export=0.24 s
+  | solves=1 | total=40.43 s | peak RSS=1.31 GiB | cpu | OpenMP 4 threads | Eigen serial
 ```
 
-Fixtures used above: [`tests/fixtures/parts/pipe.step`](../tests/fixtures/parts/pipe.step),
-[`tests/fixtures/parts/sphere.step`](../tests/fixtures/parts/sphere.step).
+`preflight` is the symbolic factor-count analysis and the memory decision;
+`order` is the symbolic factorization (or the CG preconditioner build);
+`factor` is the numeric factorization (or the CG iteration loop); `stress` is
+ZZ recovery. Each is measured where it happens — nothing is derived by
+subtraction, so the phases sum to slightly less than `total` and the remainder
+is un-instrumented overhead rather than a fudge. `peak RSS` is the kernel's own
+high-water mark (`VmHWM`), not an estimate. `solves` is how many linear systems
+the run actually factorized: a CAD run with no `--adapt` and no η target is
+**1**, because the pre-promotion linear solve whose answer the quadratic
+re-solve overwrites is skipped.
 
-## GUI
+`POLYMESH_FEA_DIRECT=cholmod|ldlt|lu` promotes one rung of the direct ladder to
+the front, which is how the comparison table in
+[solver-core.md §6](solver-core.md#6-what-the-linear-solve-costs) is
+reproduced. The remaining rungs stay as fallbacks, so forcing a rung cannot
+turn a solvable system into a failure.
 
-![PolyMesh Studio](assets/showcase/gui_studio.png)
+### `diag <part> [flags]`
 
-```sh
-dist/polymesh/bin/polymesh-gui
-dist/polymesh/bin/polymesh-gui \
-  dist/polymesh/share/polymesh/examples/unit_box.step
-```
+JSON diagnostics: import fidelity against the exact BRep, per-element-type mesh quality,
+phase timings, and (unless `--no-solve`) a default cantilever solve. The JSON is written
+to `--json` when given and always echoed on stdout.
 
-The default Study workspace keeps Model, material/mesh presets, Run, and
-fixture/load assignment on the left; the viewport owns the center; field,
-deformation, metrics, and VTU export live in the Results inspector. Advanced
-mesher/adapt/resource controls are disclosed on demand. Repository campaigns,
-raw result tables, and self-improve controls live under **Workspace → Developer
-/ Test Lab** instead of occupying the release UI.
+| Flag | Meaning |
+|---|---|
+| `-h m` | element size; auto h is additionally capped at bbox_diag/12 so the battery stays quick (the cap is recorded in `mesh_size_note`) |
+| `--mesher name` | see [Mesher names](#mesher-names); default `varyhedron` |
+| `--json out.json` | also write the report to this path |
+| `--no-solve` | skip the diagnostic solve |
+| `--no-curved` | diagnose the straight-edged linear mesh |
+| `--no-spectral` / `--spectral` | disable / (default) spectral sizing |
+| `--max-elems N` / `--max-dof N` / `--max-mem GB` | ceilings, as for `solve` |
+| `--fix-box ...6` / `--load-box ...6` | BC / load selection AABBs (they feed the refinement plan too, so `bc_seeds` is a real measurement) |
+| `--load-dir x y z` / `--force N` / `--traction Pa` | load specification, as for `solve` |
+| `--scale f` | uniform import scale (see [Units](#units)) |
 
-F12 or **File → Save screenshot** writes the window framebuffer to a PNG.
-`POLYMESH_GUI_SHOT=/abs/path.png` selects a fixed path and
-`POLYMESH_GUI_SCALE=0.75..3.0` overrides monitor scale for deterministic capture.
-CI launches the installed GUI under Xvfb in addition to the headless Catch2
-pipeline tests.
+Top-level JSON keys: `part`, `mesher`, `scale` (the import factor this run used),
+`import` (vertices, triangles, bbox_diag, cad_brep), `mesh` (h, nodes, elements,
+quality_min, quality_min_type, n_inverted_cells, n_below_shape_floor, quality_mean,
+geometry_seeds, bc_seeds, geo_curv), `spectral`, `timing_ms`,
+`mesh_throughput_elem_per_s`, `fidelity`, `solve` (ran, dof, max_von_mises, max_disp,
+global_eta), `mesh_size_note`, `mesher_note`. Every length in the report is in scaled
+units.
 
-## Meshers
+### `render <part> -o out.png [flags]`
 
-`--mesher` takes `hybrid|zoo` (default), `varyhedron|vary` (CAD packing),
-`cvt_poly|cvt` (experimental packed-poly VEM), `hybridvem`, `tet`, `hex`,
-`hexvem|vem`, `graded`, `hexpyr|transition`, `prism|sweep`, or
-`octa|octahedral` (experimental).
+Headless PNG of the same boundary surface the Studio viewport paints — no GL, no window.
+It runs the product mesh path, so the image can only show geometry the shipped mesher
+actually produced. `-o` is required.
 
-Other mesh flags: `--skin n` (graded fine skin layers, default 2),
-`--no-feature` (disable curvature/thin-wall grading), `--element-tendency t`
-(shape dial in [-1,+1]: hex ↔ fan hybrid ↔ poly VEM ↔ tet), `--p-elevate`
-(promote smooth tet4/hex8 → tet10/hex20; auto-on with `--adapt > 0`),
-`--bc-grade`, `-E` (Pa), `-nu`.
+| Flag | Meaning |
+|---|---|
+| `-o out.png` | **required** image path |
+| `-h m` | element size; omit for auto |
+| `--mesher name` | see [Mesher names](#mesher-names); default `graded` |
+| `--no-curved` | render the straight-edged linear mesh |
+| `--no-feature` | disable geometry grading |
+| `--no-spectral` | disable spectral sizing |
+| `--subdiv N` | subdivisions per quadratic boundary face, clamped to 1…16 (default 8, the viewport's value); linear faces have no interior to subdivide and ignore it |
+| `--size WxH` | pixel size (default 1200x900); rejects anything that is not two positive integers up to 16384 |
+| `--azimuth DEG` / `--elevation DEG` | orbit camera angles (defaults 35 / 25); the projection is orthographic, so a view is reproducible from these two numbers |
+| `--wireframe` | overlay the tessellation triangle edges |
+| `--stats out.json` | numeric render report — node/element counts, element-type census, triangle count, covered/silhouette pixels, and facet-normal deviation against the exact BRep normal (omitted for non-CAD input, which has no exact normal) |
+| `--scale f` | uniform import scale (see [Units](#units)) |
 
-## Sizing
+### `calibrate --out host.json [--reference part.step] [--reference-h m]`
 
-Spectral sizing ([ADR-0034](decisions/0034-spectral-sizing-and-coarsening.md))
-is on by default in the CLI, and `--no-spectral` opts out. CAD-edge curvature is
-FFT-denoised before it emits chordal size sources, and the fused size field is
-energy-truncated on a Cartesian grid so spectrally insignificant fine bands
-merge into the coarse field. A geometry-only floor is re-imposed after
-filtering, so trimming can never blur a real feature. `mesh` and `solve` print
-the kept/total mode counts and the before/after density predictions, and
-`diag --json` carries a `spectral` block. With `--advisor DIR`,
-`--advisor-max-dof N` drops candidate actions whose predicted DOF exceeds N;
-when none fit, the advisor refuses and returns clamp-box defaults.
+Benchmark portable FLOP and byte rates plus a reference mesh time for this host and
+write them as JSON (`host`, `flops_per_s`, `bytes_per_s`, `ref_mesh_ms`,
+`generated_utc`). `--out` is required; a non-positive benchmark result is an error.
+The reference mesh is the packaged `plate_hole.step`, located relative to the
+executable (`share/polymesh/calibration/`); `--reference` and `--reference-h` (metres,
+default 0.004) override it. The command never searches repository test paths.
 
-## Loads and boundary conditions
+### `backend`
 
-`solve` and `diag` take `--load-dir x y z` (direction, normalised; default
-`0 1 0`), `--force N` (total resultant in newtons over the loaded faces, default
-1000) and `--traction Pa` (pressure instead of a total force, so the resultant
-is Pa × loaded-face area). The last of `--force` / `--traction` wins. Either way
-the load is applied as a consistent traction ∫Nᵀt dS over the selected boundary
-faces, never as lumped point forces, and the run prints the resulting nodal-load
-sum next to the requested resultant as a conservation check. `diag` accepts
-`--fix-box` and `--load-box` too, so a diagnostics run can reproduce the exact
-boundary conditions of a solve.
+Print the compute backend plus the OpenMP / optimisation summary and exit. No flags.
 
-`--fix-box` and `--load-box` name a region of the **boundary surface**, and they
-select the boundary nodes and faces inside it — never interior nodes. Constraining
-the interior would embed a rigid inclusion: an element whose nodes all fall inside
-a fixture box has identically zero strain, so its stress is identically zero, and
-the union of such elements ends on a one-element staircase set by the tiling
-rather than by the problem. That was the shipped behaviour before ADR-0038, and
-it froze 30.7% of the showcase cylinder's elements solid
-([ADR-0038](decisions/0038-a-fixture-is-applied-to-the-boundary.md)). A load
-region goes one step further and is integrated at the box plane rather than over
-whole faces, so the applied traction does not depend on which element edges happen
-to fall inside
-([ADR-0037](decisions/0037-a-box-selection-is-a-region.md)).
+## Mesher names
 
-## Rendering
+`--mesher` accepts every spelling `pipeline::mesher_from_name` knows, and an unknown
+name is an error rather than a silent fallback:
 
-`render` flags: `--subdiv N` (tessellation subdivisions per quadratic boundary
-face, default 8, the value the Studio viewport uses), `--size WxH` (default
-`1200x900`), `--azimuth DEG` and `--elevation DEG` (orbit camera, defaults 35 /
-25; the projection is orthographic, so a view is reproducible from those two
-numbers), `--wireframe` (overlay the tessellation triangle edges), and
-`--stats out.json`. The stats report carries node and element counts, the
-element-type census, triangle count, covered and silhouette pixel counts, and
-`normal_deviation_deg` — the mean/p99/max angle between each rendered facet
-normal and the exact B-rep normal at its centroid, labelled with the
-`normal_reference` actually used. On
-[`tests/fixtures/parts/sphere.step`](../tests/fixtures/parts/sphere.step) at
-`-h 0.02` the curved default measures p99 0.34°; the same run with `--no-curved`
-measures 2.72°, which is the chordal error the curved geometry removes.
+| Name(s) | Mesher |
+|---|---|
+| `hybrid`, `zoo`, `hybrid_zoo`, `mixed` | hex bulk + pyramid skin (ADR-0012 v3) |
+| `hybridvem`, `hybrid_vem`, `hybrid-vem` | hex FE bulk + native poly VEM transitions |
+| `varyhedron`, `vary` | variable poly packing from CAD (ADR-0021) |
+| `cvt_poly`, `cvt`, `restricted_cvt` | restricted CVT → clipped Voronoi poly VEM (experimental) |
+| `tet`, `tet_fill` | tet fill |
+| `hex` | hex fill |
+| `hexvem`, `vem`, `hex_vem` | hex VEM |
+| `graded`, `graded_tet` | graded tet |
+| `hexpyr`, `transition` | hex core + pyramid skin (ADR-0013) |
+| `prism`, `sweep` | Cartesian prism6 wedges along the dominant axis |
+| `octa`, `octahedral` | BCC octahedra → tet4 (experimental) |
 
-## Resource limits
+## Default BC selection
 
-All subcommands take `--max-mem <GB>` to cap the estimated solve footprint, and
-`--max-elems N` / `--max-dof N` to cap mesh size (`0` = auto on all three).
-These are enforced, not advisory. A solve estimates its footprint — CSR nnz from
-the real connectivity, plus the LDLT factor fill-in or the CG working set — and
-refuses with the estimate, the cap and the limiting term when it would exceed
-`min(--max-mem, 70% of available system memory)`; under `kAuto` a solve that
-fits CG but not LDLT is downgraded rather than failed. Meshing predicts its
-element count first and caps it at 589,824 elements / 1,769,472 DOF by default:
-with an explicit `-h` it refuses up front, while auto sizing clamps h upward
-(reported in the mesh note as `auto h clamped from … (element ceiling …)`) and
-coarsens-and-retries rather than failing. Adapt passes stop when the next pass
-would breach the ceiling. Mesh and CG loops poll cancellation every iteration,
-so **Cancel** returns in milliseconds instead of at the next phase boundary. See
-[`src/fea/include/fea/resource_budget.hpp`](../src/fea/include/fea/resource_budget.hpp).
-
-## Host calibration
-
-`calibrate` measures portable FLOP, memory-bandwidth, and reference-mesh rates
-for the advisor's calibrated-efficiency objective:
-
-```sh
-$CLI calibrate --out host.json
-```
-
-Installed and build-tree binaries locate the packaged `plate_hole.step`
-calibration asset relative to the executable. `--reference part.step` and
-`--reference-h metres` deliberately override that asset; the command never
-searches repository test paths at runtime.
-
-## Build options
-
-```sh
-cmake -B build -DPOLYMESH_WITH_OCC=ON      # STEP/B-rep (OpenCASCADE), default ON
-cmake -B build -DPOLYMESH_WITH_CUDA=ON     # GPU backends, default OFF
-cmake -B build -DPOLYMESH_WITH_OPENMP=OFF  # force serial assembly
-cmake -B build -DPOLYMESH_WITH_GUI=OFF     # libs + CLI + tests only
-cmake -B build -DPOLYMESH_WITH_ADVISOR=OFF # skip the ONNX inference module
-cmake -B build -DPOLYMESH_WITH_GEOGRAM=OFF # no clipped-cell (restricted CVT) kernel
-cmake -B build -DPOLYMESH_BUILD_TESTS=OFF  # skip Catch2 and ctest registration
-```
-
-OpenMP (default ON) parallelises element-stiffness formation, mesh inside-tests,
-ZZ recovery, stress recovery and CSR SpMV, using thread-local triplets merged
-outside the hot loop. Results match the serial path within patch-test
-tolerances, and Eigen dense kernels stay single-threaded to avoid nested-OpenMP
-hangs. Missing OpenMP falls back to serial automatically.
-
-CUDA is OFF by default. `fea::spmv_cpu` and `csr_from_eigen` always build; the
-CUDA SpMV in [`backend_cuda.cu`](../src/fea/src/backend_cuda.cu) runs only with
-a device present and is parity-tested against the CPU path. `polymesh backend`
-reports `cpu` or `cuda (<device>)`. Batched element-stiffness GPU kernels are
-not wired yet. If host GCC outruns nvcc, add
-`-DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler"`. If CMake cannot find OCCT,
-point it at the prefix holding `OpenCASCADEConfig.cmake` with
-`-DOpenCASCADE_DIR=/path/to/cmake/OpenCASCADE`; see
-[`src/geom/CMakeLists.txt`](../src/geom/CMakeLists.txt).
-
-## Solver internals
-
-For the linear solve, `fea::solve_elastostatics` partitions Dirichlet DOFs, then
-uses `SimplicialLDLT` up to 50000 free DOFs and incomplete-Cholesky-
-preconditioned `ConjugateGradient` above that (`SolveMethod::kAuto`), with a
-bounded iteration cap so a non-converging system fails instead of grinding. The
-choice depends only on free-DOF count, never on element type. Patch tests and
-verification meshes stay on the direct path so constant-strain exactness is
-preserved. See [`src/fea/include/fea/solve.hpp`](../src/fea/include/fea/solve.hpp).
-
-## Product limits
-
-- CAD product commands accept STEP/BRep, not STL. Gmsh `.msh` is accepted only
-  as an already-generated volume mesh for `solve`.
-- Product fills are Cartesian grid based, not constrained Delaunay.
-- At the extreme `cylinder` graded setting h=0.005, a closed mesh can contain a
-  sliver chain that the current CG policy cannot solve.
-- Default min/max-face boundary conditions are a convenience for simple parts.
-  Use `--fix-box` / `--load-box` or GUI CAD-face selection on curved geometry.
-- The advisor selects or refuses among measured candidates; it does not
-  guarantee an error tolerance. Fine graded geometry work can be
-  non-interruptible for long periods.
-- VTU result export contains displacement, von Mises, ZZ η, and cell quality;
-  it does not yet export the full stress tensor or reactions.
-
-The measured evidence and precise caveats are maintained in
-[`README.md` § Limits](../README.md#limits).
-
-## Tests and benchmarks
-
-`ctest --test-dir build --output-on-failure --parallel 2` runs the Catch2 suite
-in [`tests/`](../tests/), which covers patch tests, the Tier-1 analytical cases,
-mesher fidelity and quality contracts, and the advisor's C++/Python parity.
-
-Labeled time and accuracy snapshots live in
-[`bench/results/`](../bench/results/) (schema:
-[`bench/competitive/schema.json`](../bench/competitive/schema.json)); the
-generated table is [the benchmark scoreboard](bench/scoreboard.md). The
-harness design and its anti-cheat rules are in
-[docs/benchmarks.md](benchmarks.md).
-
-```sh
-python3 bench/competitive/render_scoreboard.py   # refresh scoreboard
-./bench/competitive/run_polymesh_smoke.sh        # Tier-0/1 ctest smoke
-python3 bench/d6/run_tier3.py --full --render    # D6 uniform tet10 vs graded
-python scripts/render_showcase.py --all          # regenerate showcase assets
-```
+Nodes in a 0.51·h slab at min-x are fixed and the matching slab at max-x is loaded. Only
+boundary nodes and faces are ever selected — a selection names a patch of the boundary,
+never a volume of material to freeze. When a slab captures too few nodes to behave like
+a face (curved parts: fewer than 12 nodes or under 2% of the boundary nodes), selection
+falls back to the boundary faces whose outward normal aligns with ∓x/±x within the outer
+10%, 25%, then 50% of the x extent.

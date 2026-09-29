@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Rebuild a campaign's ``results.jsonl`` from its per-run ``result.json`` artifacts.
 
-``apps/testlab/main.cpp`` appends one summary row per run to ``results.jsonl`` and also
+``polymesh_testlab`` appends one summary row per run to ``results.jsonl`` and also
 writes the same object to ``runs/<cfg_id>/<part>/t<tier>/result.json``. The per-run copy
-goes through ``atomic_write`` (tmp + flush + checked + rename, ``apps/testlab/main.cpp``
-:99-113), so it is strictly more durable than the summary append -- and it is written
+goes through ``atomic_write`` (tmp + flush + checked + rename, ``apps/testlab/run_artifacts.hpp``),
+so it is strictly more durable than the summary append -- and it is written
 *before* the row is appended. Any failure between those two points therefore leaves
 completed, durably-recorded work missing from the summary file.
 
@@ -19,7 +19,7 @@ Rules:
   Rows already present in ``results.jsonl`` are re-emitted as their original bytes, never
   re-serialised, so a successful rebuild leaves the existing content untouched.
 * Rows are deduplicated on ``(cfg_id, part, tier)`` -- the same key the runner uses to
-  decide what to skip on resume (``completed_keys``, ``apps/testlab/main.cpp``:2762).
+  decide what to skip on resume (``completed_keys``, ``apps/testlab/campaign_runner.cpp``).
 * Rows are emitted in campaign-plan order: tier, then config, then the part order of
   ``campaign.json``. Config order is taken from the order config ids first appear in the
   existing ``results.jsonl`` (which the runner wrote in plan order), with any config seen
@@ -29,8 +29,9 @@ Rules:
   is a strict prefix of the reconstruction. If it is not, some existing row would be
   discarded or reordered, and the tool refuses and reports the divergence; ``--force``
   overrides. A recovery tool that can silently drop rows is worse than the problem.
-* Only campaigns that persist artifacts are recoverable: ``apps/testlab/main.cpp``:3047
-  writes a run directory only when ``camp.warehouse`` is set or ``adapt_passes > 0``.
+* Only campaigns that persist artifacts are recoverable: ``run_campaign``
+  (``apps/testlab/campaign_runner.cpp``) writes a run directory only when
+  ``camp.warehouse`` is set or ``adapt_passes > 0``.
   Without artifacts there is nothing to rebuild from, and the tool says so rather than
   producing a short file.
 * ``checkpoint.json``'s ``completed_runs`` is recomputed to the rebuilt row count. Every
@@ -55,8 +56,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[2]
-CAMPAIGNS = ROOT / "bench" / "campaigns"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from advisor.paths import CAMPAIGNS_DIR, REPO_ROOT  # noqa: E402
 
 #: Same separators/ordering as nlohmann::json's default ``dump()`` so a recovered row is
 #: byte-comparable with a runner-emitted one (nlohmann stores objects key-sorted).
@@ -69,7 +70,7 @@ _DUMP_KWARGS: dict[str, Any] = {
 
 def rel(path: Path) -> str:
     try:
-        return path.relative_to(ROOT).as_posix()
+        return path.relative_to(REPO_ROOT).as_posix()
     except ValueError:
         return path.as_posix()
 
@@ -231,7 +232,7 @@ def rebuild(directory: Path, *, dry_run: bool, force: bool) -> int:
         warehouse = bool(campaign.get("warehouse"))
         print("  nothing to rebuild from: no usable per-run result.json found.")
         if not warehouse:
-            print("  this campaign has warehouse=false, so apps/testlab/main.cpp:3047 "
+            print("  this campaign has warehouse=false, so apps/testlab/campaign_runner.cpp "
                   "only writes run directories for configs with adapt_passes > 0.")
         return 1
 
@@ -425,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --campaign is required (or pass --selftest)")
         return 2
     candidate = Path(args.campaign)
-    directory = candidate if candidate.is_dir() else CAMPAIGNS / args.campaign
+    directory = candidate if candidate.is_dir() else CAMPAIGNS_DIR / args.campaign
     if not directory.is_dir():
         print(f"error: {rel(directory)} is not a directory")
         return 2

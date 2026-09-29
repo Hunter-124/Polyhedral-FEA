@@ -9,6 +9,7 @@
 #include <Eigen/Core>
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -57,23 +58,20 @@ struct CadFace {
     std::uint32_t id = 0;
     CadSurfaceKind kind = CadSurfaceKind::kOther;
     double area = 0.0;
+    /// Smallest intrinsic extent of the exact trimmed face's oriented bounds.
+    /// For planes, excludes the zero-thickness normal direction.
+    /// Infinity means unavailable; such a face must not be absorbed by a mesh.
+    double min_extent = std::numeric_limits<double>::infinity();
     std::vector<std::uint32_t> edge_ids;
     /// Sample points strictly inside the trimmed face, in model coordinates
     /// (metres): the face's TopLoc_Location is applied. Empty for kPlane (a
     /// plane has zero curvature everywhere, so the grid would cost without
     /// telling anyone anything) and empty when OCC is disabled.
     ///
-    /// These are *exact* surface properties evaluated on the BRep, deliberately
-    /// independent of any triangulation. That independence is the whole point:
-    /// OCC's tessellation of a mirror-symmetric part is itself not
-    /// mirror-symmetric, so any curvature estimated from it cannot be either.
-    /// Measured at the product's own deflection (5e-4·bbox_diag, 0.2 rad), the
-    /// fraction of tessellation vertices with an exact mirror partner is
-    /// sphere x 0.00% / y 99.69% / z 1.33%, plate_hole x 5.97% (cylinder is the
-    /// only 100%); the sphere's seam meridian and poles put facets in entirely
-    /// different places on the two sides of the yz-plane. A uv grid on the
-    /// analytic surface has no such seam bias, so a mesh decision sized from
-    /// `kappa_samples` can be mirror-symmetric where one sized from
+    /// These are *exact* surface properties evaluated on the BRep, independent
+    /// of any triangulation: OCC's tessellation of a mirror-symmetric part is
+    /// not itself mirror-symmetric (seams, poles), so sizing from
+    /// `kappa_samples` can be symmetric where sizing from
     /// `geom::estimate_vertex_curvature` cannot (ADR-0036 §6).
     std::vector<Eigen::Vector3d> samples;
     /// max(|κ_max|, |κ_min|) principal curvature magnitude (1/m) at each

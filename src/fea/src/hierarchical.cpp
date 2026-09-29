@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/hierarchical.hpp"
 
+#include "strain_displacement.hpp"
+
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
 
@@ -365,26 +367,6 @@ void eval_tet_mode(const TetRecipe& rec, const std::array<double, 4>& lam,
            (l0 * l1 * l2 * l3 * L1 * L2 * dL3) * (glam[3] - glam[0]);
 }
 
-// Strain-displacement matrix (6 x 3n), Voigt order (xx,yy,zz,yz,xz,xy) with
-// engineering shears, from physical mode gradients (n x 3).
-Eigen::MatrixXd b_matrix(const Eigen::Matrix<double, Eigen::Dynamic, 3>& dndx) {
-    const Eigen::Index n = dndx.rows();
-    Eigen::MatrixXd b = Eigen::MatrixXd::Zero(6, 3 * n);
-    for (Eigen::Index a = 0; a < n; ++a) {
-        const double dx = dndx(a, 0), dy = dndx(a, 1), dz = dndx(a, 2);
-        b(0, 3 * a + 0) = dx;
-        b(1, 3 * a + 1) = dy;
-        b(2, 3 * a + 2) = dz;
-        b(3, 3 * a + 1) = dz;
-        b(3, 3 * a + 2) = dy;
-        b(4, 3 * a + 0) = dz;
-        b(4, 3 * a + 2) = dx;
-        b(5, 3 * a + 0) = dy;
-        b(5, 3 * a + 1) = dx;
-    }
-    return b;
-}
-
 } // namespace
 
 std::vector<HpMode> hp_modes(ElementType type, std::uint8_t order) {
@@ -490,7 +472,7 @@ hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic, 3>& vertex_coor
         const Eigen::Matrix3d jac_inv = jac.inverse();
         const auto field = hp_eval(type, order, qp.xi);
         const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = field.dn * jac_inv.transpose();
-        const auto b = b_matrix(dndx);
+        const auto b = detail::strain_displacement(dndx);
         k.noalias() += b.transpose() * d * b * (det * qp.weight);
     }
     return k;

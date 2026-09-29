@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Thin facade over vendored Geogram ConvexCell (G1 / ADR-0025).
-// Callers must not include Delaunay_psm.h outside geogram_clip.cpp.
+// Thin facade over vendored Geogram ConvexCell (ADR-0025). Delaunay_psm.h is
+// included only by polymesh_mesh sources, via the private src/cvt_geometry.hpp.
 
 #include <Eigen/Core>
 
@@ -17,10 +17,6 @@ namespace polymesh::mesh {
 /// True when this build linked `polymesh_geogram` (POLYMESH_WITH_GEOGRAM).
 [[nodiscard]] bool geogram_available() noexcept;
 
-/// Initialize Geogram process state once (safe to call repeatedly).
-/// No-op when geogram is not compiled in.
-void geogram_ensure_initialized();
-
 /// Axis-aligned box used as the initial ConvexCell domain.
 struct ClipBox {
     Eigen::Vector3d min{0, 0, 0};
@@ -28,7 +24,7 @@ struct ClipBox {
 };
 
 /// Plane ax + by + cz + d = 0. ConvexCell keeps the halfspace
-/// a·x + d ≥ 0 (see G1 smoke / Geogram VBW::ConvexCell convention).
+/// a·x + d ≥ 0 (Geogram VBW::ConvexCell convention).
 struct ClipPlane {
     double a = 0;
     double b = 0;

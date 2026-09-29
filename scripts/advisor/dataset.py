@@ -28,7 +28,6 @@ import hashlib
 import json
 import math
 import os
-import re
 import subprocess
 import sys
 from collections import Counter
@@ -38,59 +37,60 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-try:
-    from .cost_labels import portable_cost_label
-except ImportError:  # direct `python scripts/advisor/dataset.py`
-    from cost_labels import portable_cost_label
 
-ROOT = Path(__file__).resolve().parents[2]
-ADVISOR_DIR = ROOT / "bench" / "advisor"
+# The column families, the action space, the hold-out grouping and the CSV
+# cell parsing live in their own modules; every name below is re-exported so
+# ``from .dataset import ...`` stays the one import consumers need.
+try:
+    from .actions import (  # noqa: F401 - re-exported
+        ACTION_DEFAULTS, CLAMP_BOX, CONTINUOUS_ACTION_DIMS, GATE_THRESHOLD,
+        ORDER_CHOICES, VETO_THRESHOLD, action_group_slices, build_action_dims,
+        candidate_grid, clamp_table, continuous_box_halfwidths,
+    )
+    from .cost_labels import portable_cost_label
+    from .csv_io import read_rows, row_key, to_bool, to_float  # noqa: F401
+    from .features import (  # noqa: F401 - re-exported
+        ADVISOR_ROW_SCHEMAS, CASE_COLUMNS, CATEGORICAL_INDEX_COLUMNS,
+        CONTINUOUS_ACTION_COLUMNS, DERIVED_FEATURE_COLUMNS, FEATURE_COLUMNS,
+        input_columns,
+    )
+    from .paths import ADVISOR_DIR, REPO_ROOT
+    from .splits import (  # noqa: F401 - re-exported
+        CASE_SUFFIX_RE, DEFAULT_SPLIT_MODE, PART_SUFFIX_RE, SPLIT_MODES,
+        add_split_args, family_of, fold_groups, geometry_of, group_of,
+        split_groups, split_mask,
+    )
+except ImportError:  # direct `python scripts/advisor/dataset.py`
+    from actions import (  # noqa: F401 - re-exported
+        ACTION_DEFAULTS, CLAMP_BOX, CONTINUOUS_ACTION_DIMS, GATE_THRESHOLD,
+        ORDER_CHOICES, VETO_THRESHOLD, action_group_slices, build_action_dims,
+        candidate_grid, clamp_table, continuous_box_halfwidths,
+    )
+    from cost_labels import portable_cost_label
+    from csv_io import read_rows, row_key, to_bool, to_float  # noqa: F401
+    from features import (  # noqa: F401 - re-exported
+        ADVISOR_ROW_SCHEMAS, CASE_COLUMNS, CATEGORICAL_INDEX_COLUMNS,
+        CONTINUOUS_ACTION_COLUMNS, DERIVED_FEATURE_COLUMNS, FEATURE_COLUMNS,
+        input_columns,
+    )
+    from paths import ADVISOR_DIR, REPO_ROOT
+    from splits import (  # noqa: F401 - re-exported
+        CASE_SUFFIX_RE, DEFAULT_SPLIT_MODE, PART_SUFFIX_RE, SPLIT_MODES,
+        add_split_args, family_of, fold_groups, geometry_of, group_of,
+        split_groups, split_mask,
+    )
+
+ROOT = REPO_ROOT
 DATASET_CSV = ADVISOR_DIR / "dataset.csv"
 NORMALIZATION_JSON = ADVISOR_DIR / "normalization.json"
 CLAMPS_JSON = ADVISOR_DIR / "clamps.json"
-
-#: Only rows emitted by the advisor-aware testlab path carry the full C2
-#: feature/action vector. Legacy campaign rows leave all 26 features and most
-#: of the action columns empty, so training on them silently learns from
-#: imputed constants; ``load_dataset`` rejects them outright.
-ADVISOR_ROW_SCHEMAS = frozenset({"advisor-row-v3", "advisor-row-v4"})
-
-# --- C2 input columns -------------------------------------------------------
-
-FEATURE_COLUMNS: list[str] = [
-    "bbox_dx", "bbox_dy", "bbox_dz", "diag", "volume", "surface_area",
-    "sa_over_v23", "n_faces", "n_sharp_edges", "sharp_edge_len_total",
-    "curved_frac", "kappa_max_h", "kappa_mean_h", "thin_min_over_diag",
-    "thin_p10_over_diag", "min_feature_h", "n_fix_faces", "n_load_faces",
-    "fix_area_frac", "load_area_frac", "load_dir_x", "load_dir_y", "load_dir_z",
-    "fix_load_dist_over_diag", "load_axis_alignment", "poisson",
-    # Proximity / crease / singularity block, appended for the portable-cost
-    # retrain in the order the contract fixes and `pipeline::CaseFeatures`
-    # declares. Appended, never inserted: the C++ side reads inputs by name but
-    # the ONNX graph is positional, so an insertion silently reindexes a shipped
-    # model. The first ten are also emitted per PART by
-    # `geometry_features.py`; `_load_geometry_features` drops those duplicates
-    # because the per-ROW value comes from the shipped C++ extractor with the
-    # case's own inputs, and two columns of the same name would leave one of
-    # them permanently NaN.
-    "geo_n_inner_loops", "geo_hole_spacing_min_rel", "geo_hole_spacing_p10_rel",
-    "geo_feat_pair_dist_min_rel", "geo_feat_pair_dist_p10_rel",
-    "geo_feat_pair_dist_mean_rel", "geo_dihedral_p10", "geo_dihedral_p50",
-    "geo_dihedral_p90", "geo_singular_lambda_min",
-    "load_to_feature_dist_min_rel", "fix_to_feature_dist_min_rel",
-    "case_load_multiaxiality",
-]
-CASE_COLUMNS: list[str] = [
-    "case_poisson", "case_n_fix_regions", "case_n_load_regions", "case_load_dir_x",
-    "case_load_dir_y", "case_load_dir_z", "case_traction_magnitude",
-]
 
 #: Real per-part geometric descriptors, computed offline from the STEP files by
 #: ``scripts/advisor/geometry_features.py`` and joined by geometry name. They
 #: exist because the campaign's own geometry columns are largely dead: ten of
 #: the original 44 inputs are constant across all 3,456 rows, and ``curved_frac``
-#: is 1.0 in every single one because its formula saturates
-#: (``apps/testlab/main.cpp:1709``). A model cannot prefer ``graded_tet`` on a
+#: is 1.0 in every single one because its formula saturated (``geom_class_of``
+#: in apps/testlab at the time). A model cannot prefer ``graded_tet`` on a
 #: curved part when every part reports identical curvature, which is the most
 #: likely reason matched-cost judgement measured worse than random.
 #:
@@ -141,33 +141,6 @@ def _load_geometry_features() -> tuple[list[str], dict[str, dict[str, float]]]:
 
 
 GEOMETRY_FEATURE_COLUMNS, GEOMETRY_FEATURE_TABLE = _load_geometry_features()
-CONTINUOUS_ACTION_COLUMNS: list[str] = [
-    # ``p_elevate`` is deliberately absent. It is not merely unvaried in the
-    # corpus, it is redundant: ``apps/cli/main.cpp:805`` computes
-    # ``p_elevate = decision.p_elevate || decision.order >= 2``, so it actuates
-    # exactly what ``order >= 2`` already actuates. Advertising it as a separate
-    # policy dimension claimed a control the engine does not have.
-    "h_rel", "eta_target", "adapt_passes", "element_tendency",
-    "skin_layers", "feature_refine", "bc_grading", "adapt_leb_waves",
-]
-CATEGORICAL_INDEX_COLUMNS: list[str] = ["order_idx", "mesher_idx"]
-
-#: Scale-law inputs, derived per row rather than read from the CSV.
-#:
-#: Element count obeys ``n ~ volume / h^3`` and the cost heads are log10
-#: targets, so the relationship the cost heads need is LINEAR in these four
-#: and in nothing the raw columns offer: ``h`` itself is not an input at all
-#: (only the dimensionless ``h_rel``), and ``volume`` spans several decades
-#: across the corpus, which standardisation compresses into a spike.
-#:
-#: Measured on the clean regenerated dataset with a family-held-out split, the
-#: net without these features predicted DOF to a validation MAE of 0.70 in
-#: log10 -- a factor of five -- while a LightGBM baseline on the same split and
-#: the same columns reached 0.059, because trees can recover a ratio by
-#: splitting where a standardised MLP cannot.
-DERIVED_FEATURE_COLUMNS: list[str] = [
-    "log10_volume", "log10_diag", "log10_h", "log10_cells",
-]
 
 
 def derived_features(volume: float, diag: float, h_rel: float) -> dict[str, float]:
@@ -188,10 +161,8 @@ def derived_features(volume: float, diag: float, h_rel: float) -> dict[str, floa
     }
 
 
-INPUT_COLUMNS: list[str] = (
-    FEATURE_COLUMNS + GEOMETRY_FEATURE_COLUMNS + CASE_COLUMNS
-    + CONTINUOUS_ACTION_COLUMNS + DERIVED_FEATURE_COLUMNS + CATEGORICAL_INDEX_COLUMNS
-)
+#: The network input vector; see ``features.input_families`` for its blocks.
+INPUT_COLUMNS: list[str] = input_columns(GEOMETRY_FEATURE_COLUMNS)
 PASSTHROUGH_COLUMNS: list[str] = list(CATEGORICAL_INDEX_COLUMNS)
 
 # --- heads ------------------------------------------------------------------
@@ -234,149 +205,7 @@ TARGET_SOURCES: dict[str, tuple[str, float]] = {
 #: statuses that are *not* a failure (C7 failure head definition)
 OK_STATUSES: frozenset[str] = frozenset({"ok", "solve_suspect", "cost_only"})
 
-# --- C4 clamp box -----------------------------------------------------------
-
-#: Only orders 1 and 2 exist. ``fea::promote_to_quadratic``
-#: (``src/fea/include/fea/p_elevate.hpp:33-38``) is a single linear->quadratic
-#: step, and ``apps/cli/main.cpp:814-818`` warns and downgrades anything higher.
-#: The vocabulary previously advertised 3 and 4, so the policy head spent two of
-#: its ten outputs on actions that could never be performed.
-ORDER_CHOICES: list[int] = [1, 2]
-CONTINUOUS_ACTION_DIMS: list[str] = ["h_rel", "adapt_passes", "eta_target"]
-CLAMP_BOX: dict[str, tuple[float, float]] = {
-    "h_rel": (0.005, 0.28),
-    # The plan's floor of 0.005 excluded eta_target's own default. In the
-    # harness 0.0 means "no adaptive error target", which is a legal and common
-    # action (every adapt_passes=0 row uses it), so the box has to contain it —
-    # otherwise the clamp would silently turn adaptivity on.
-    "eta_target": (0.0, 0.3),
-    "adapt_passes": (0.0, 6.0),
-}
-#: Refuses the whole recommendation after the fact — an abstention.
-VETO_THRESHOLD = 0.5
-#: Drops individual candidates before ranking. A DIFFERENT decision from the
-#: veto, and deliberately a different number: the C++ used to inherit this from
-#: `veto_threshold` when the key was absent, which shipped the gate at 0.5 —
-#: the weakest member of its own sweep — while looking deliberate. The C++ now
-#: rejects a clamps.json that omits it.
-#:
-#: 0.05 is chosen on pick-failure rate, not regret. Across thresholds 0.05–0.8
-#: held-out regret spans only 0.3233–0.3350 (leave-one-family-out, 8 families,
-#: 5 seeds), so regret does not single out any threshold — 0.2 is nominally best
-#: by 0.012 decades. Pick-failure does separate them: 27.5 % at 0.05 against
-#: 31.3 % at 0.2 and 31.2 % at 0.5. Given the failure head's calibration is
-#: mediocre (ECE 0.263), a rule that avoids doomed picks is worth more to a user
-#: than a hair of median accuracy inside the noise band.
-GATE_THRESHOLD = 0.05
-ACTION_DEFAULTS: dict[str, Any] = {
-    "mesher": "hybrid_zoo",
-    "h_rel": 0.1,
-    "order": 1,
-    "adapt_passes": 0,
-    "eta_target": 0.0,
-}
-
 STD_FLOOR = 1e-9
-
-
-# --------------------------------------------------------------------------- #
-# CSV parsing helpers
-# --------------------------------------------------------------------------- #
-
-def to_float(raw: Any) -> float:
-    """Parse a CSV cell into a float, mapping blanks/booleans/garbage sanely."""
-    if raw is None:
-        return math.nan
-    if isinstance(raw, bool):
-        return 1.0 if raw else 0.0
-    if isinstance(raw, (int, float)):
-        value = float(raw)
-        return value if math.isfinite(value) else math.nan
-    text = raw.strip()
-    if not text:
-        return math.nan
-    lowered = text.lower()
-    if lowered in ("true", "yes"):
-        return 1.0
-    if lowered in ("false", "no"):
-        return 0.0
-    if lowered in ("nan", "none", "null", "na"):
-        return math.nan
-    try:
-        value = float(text)
-    except ValueError:
-        return math.nan
-    return value if math.isfinite(value) else math.nan
-
-
-def to_bool(raw: Any) -> bool | None:
-    """Tri-state boolean parse: ``None`` when the cell is blank/unknown."""
-    if raw is None:
-        return None
-    if isinstance(raw, bool):
-        return raw
-    text = str(raw).strip().lower()
-    if text in ("true", "1", "yes"):
-        return True
-    if text in ("false", "0", "no"):
-        return False
-    return None
-
-
-def row_key(row: dict[str, str]) -> str:
-    """Stable identity for a dataset row, used by the pruning ledger."""
-    return "|".join(
-        str(row.get(name, "")).strip()
-        for name in ("campaign", "cfg_id", "part", "tier")
-    )
-
-
-#: parts are named ``<family>_s<shape>_c<case>``; ``_s\d+_c\d+`` is the suffix
-#: that distinguishes a shape variant and a load case of one family.
-PART_SUFFIX_RE = re.compile(r"_s\d+_c\d+$")
-CASE_SUFFIX_RE = re.compile(r"_c\d+$")
-
-#: How :func:`load_dataset` groups parts before holding a fold out.
-#:
-#: ``family``   all shape variants and load cases of one base geometry, e.g.
-#:              every ``box_hole_*``. Six groups today. This is the only split
-#:              that measures generalization to an unseen geometry family, and
-#:              it is the default because it is the only defensible one.
-#: ``geometry`` one CAD solid, its load cases held together, e.g. every
-#:              ``box_hole_s0_*``. Twenty-four groups today. Weaker: a held-out
-#:              geometry still has three siblings from its family in train.
-#: ``part``     one (geometry, load case) pair. Measured on the v3 corpus,
-#:              *every* held-out row then has a row in train with an identical
-#:              geometry-feature and action vector, so this mode exists only to
-#:              reproduce the leakage it causes and must never ship a number.
-SPLIT_MODES: tuple[str, ...] = ("family", "geometry", "part")
-DEFAULT_SPLIT_MODE = "family"
-
-
-def family_of(part: str) -> str:
-    """``box_hole_s0_c1`` -> ``box_hole``."""
-    return PART_SUFFIX_RE.sub("", part)
-
-
-def geometry_of(part: str) -> str:
-    """``box_hole_s0_c1`` -> ``box_hole_s0`` (one CAD solid, any load case)."""
-    return CASE_SUFFIX_RE.sub("", part)
-
-
-def group_of(part: str, mode: str = DEFAULT_SPLIT_MODE) -> str:
-    """The hold-out group a part belongs to under ``mode``."""
-    if mode == "family":
-        return family_of(part)
-    if mode == "geometry":
-        return geometry_of(part)
-    if mode == "part":
-        return part
-    raise ValueError(f"unknown split mode {mode!r}; expected one of {SPLIT_MODES}")
-
-
-def split_groups(parts: list[str], mode: str = DEFAULT_SPLIT_MODE) -> list[str]:
-    """Sorted unique hold-out groups present in ``parts``."""
-    return sorted({group_of(part, mode) for part in parts})
 
 
 # --------------------------------------------------------------------------- #
@@ -385,7 +214,7 @@ def split_groups(parts: list[str], mode: str = DEFAULT_SPLIT_MODE) -> list[str]:
 
 @dataclass
 class Split:
-    """One side of the part-hash split, fully materialized as numpy arrays."""
+    """One side of the group hold-out split, fully materialized as numpy arrays."""
 
     name: str
     keys: list[str] = field(default_factory=list)
@@ -482,174 +311,15 @@ def model_config(input_columns: list[str], action_dims: list[str],
 
 
 # --------------------------------------------------------------------------- #
-# Action encoding (C4)
-# --------------------------------------------------------------------------- #
-
-def build_action_dims(mesher_choices: list[str]) -> list[str]:
-    """The policy head's output layout: 3 continuous dims then two argmax blocks.
-
-    Width is ``3 + len(ORDER_CHOICES) + len(mesher_choices)`` = 7 today. It was
-    10 while a ``p_elevate_logit`` and two unreachable order logits were carried.
-    """
-    dims = ["h_rel", "adapt_passes", "eta_target"]
-    dims += [f"order_logit_{value}" for value in ORDER_CHOICES]
-    dims += [f"mesher_logit_{name}" for name in mesher_choices]
-    return dims
-
-
-def action_group_slices(mesher_choices: list[str]) -> dict[str, slice]:
-    """Index ranges of each logical group inside the action vector."""
-    n_continuous = len(CONTINUOUS_ACTION_DIMS)
-    n_order = len(ORDER_CHOICES)
-    n_mesher = len(mesher_choices)
-    return {
-        "continuous": slice(0, n_continuous),
-        "order": slice(n_continuous, n_continuous + n_order),
-        "mesher": slice(n_continuous + n_order, n_continuous + n_order + n_mesher),
-    }
-
-
-def candidate_grid(rows: list[dict[str, str]], mesher_choices: list[str],
-                   max_candidates: int = 128) -> dict[str, Any]:
-    """The explicit list of actions a deployed chooser enumerates and scores.
-
-    A LIST of measured actions, not a cross product of per-dial levels. The
-    difference matters twice over.
-
-    First, a cross product invents combinations. The corpus runs
-    ``adapt_passes = 0`` only at ``h_rel = 0.12``, so crossing the dials would
-    manufacture "no adaptivity at h_rel = 0.08" and ask the regression heads to
-    extrapolate to it. That is the failure mode that produced
-    ``predicted_dof = 1.5e15`` on an unseen part. Every action here was actually
-    run, so no query leaves the training support.
-
-    Second, it lets provably inert dials be collapsed. Measured on this corpus,
-    ``order`` has NO effect when ``adapt_passes > 0``: of 264 matched pairs
-    differing only in ``order``, 264 are bit-identical in ``n_dof``, ``n_nodes``
-    and ``rel_err``, because that path takes the adaptive driver's marked p-set
-    and never consults ``cfg.order`` (``src/pipeline/src/scene.cpp:4408``). Those
-    candidates are duplicates and are dropped -- 26 distinct measured tuples
-    collapse to 20. ``eta_target`` is NOT collapsed: at 193 of 237 matched pairs
-    it is inert too, but not always, so dropping it would discard real actions.
-
-    ``max_candidates`` is a latency budget: each action costs one forward pass in
-    the C++ chooser, against roughly 2 for the retired single-shot rule.
-    """
-    seen: dict[tuple[Any, ...], int] = {}
-    for row in rows:
-        mesher = str(row.get("mesher", "") or "").strip()
-        if mesher not in mesher_choices:
-            continue
-        order = to_float(row.get("order"))
-        h_rel = to_float(row.get("h_rel"))
-        passes = to_float(row.get("adapt_passes"))
-        eta = to_float(row.get("eta_target"))
-        if not all(math.isfinite(v) for v in (order, h_rel, passes, eta)):
-            continue
-        order_int = int(round(order))
-        passes_int = int(round(passes))
-        if order_int not in ORDER_CHOICES:
-            continue
-        # Collapse the inert order dial rather than scoring duplicate actions.
-        if passes_int > 0:
-            order_int = ORDER_CHOICES[0]
-        key = (mesher, order_int, round(h_rel, 6), passes_int, round(eta, 6))
-        seen[key] = seen.get(key, 0) + 1
-
-    actions = [
-        {"mesher": m, "order": o, "h_rel": h, "adapt_passes": p, "eta_target": e,
-         "measured_rows": n}
-        for (m, o, h, p, e), n in sorted(seen.items(), key=lambda kv: kv[0])
-    ]
-    grid: dict[str, Any] = {
-        "actions": actions,
-        "n_candidates": len(actions),
-        "order_collapsed_when_adapt_passes_positive": True,
-        "collapse_evidence": ("264 of 264 matched pairs differing only in order at "
-                              "adapt_passes > 0 are bit-identical in n_dof, n_nodes "
-                              "and rel_err"),
-        # Kept for readability and for the figures generator; the C++ side reads
-        # `actions`, never these.
-        "observed_levels": {
-            "h_rel": sorted({a["h_rel"] for a in actions}),
-            "adapt_passes": sorted({a["adapt_passes"] for a in actions}),
-            "eta_target": sorted({a["eta_target"] for a in actions}),
-            "order": sorted({a["order"] for a in actions}),
-            "mesher": sorted({a["mesher"] for a in actions}),
-        },
-    }
-    if not actions:
-        raise SystemExit("candidate grid is empty; the dataset has no usable actions")
-    if len(actions) > max_candidates:
-        raise SystemExit(
-            f"candidate grid has {len(actions)} actions, over the {max_candidates} "
-            "ceiling; each one costs a forward pass in the C++ chooser"
-        )
-    return grid
-
-
-def clamp_table(mesher_choices: list[str],
-                rows: list[dict[str, str]] | None = None) -> dict[str, Any]:
-    """The C4 ``clamps.json`` payload."""
-    # The default action is what a feasibility veto falls back to, so it has to
-    # be a legal action for THIS model: a default mesher absent from the trained
-    # vocabulary would hand the C++ side a name its own clamp table rejects.
-    defaults = dict(ACTION_DEFAULTS)
-    if defaults["mesher"] not in mesher_choices:
-        defaults["mesher"] = mesher_choices[0]
-    if defaults["order"] not in ORDER_CHOICES:
-        defaults["order"] = ORDER_CHOICES[0]
-    lo, hi = CLAMP_BOX["h_rel"]
-    defaults["h_rel"] = min(max(float(defaults["h_rel"]), lo), hi)
-    lo, hi = CLAMP_BOX["eta_target"]
-    defaults["eta_target"] = min(max(float(defaults["eta_target"]), lo), hi)
-    return {
-        "h_rel": list(CLAMP_BOX["h_rel"]),
-        "eta_target": list(CLAMP_BOX["eta_target"]),
-        "adapt_passes": [int(CLAMP_BOX["adapt_passes"][0]), int(CLAMP_BOX["adapt_passes"][1])],
-        "order_choices": list(ORDER_CHOICES),
-        "mesher_choices": list(mesher_choices),
-        "action_dims": build_action_dims(mesher_choices),
-        "veto_threshold": VETO_THRESHOLD,
-        "gate_threshold": GATE_THRESHOLD,
-        "candidate_grid": candidate_grid(rows, mesher_choices) if rows else None,
-        "defaults": defaults,
-    }
-
-
-def continuous_box_halfwidths() -> np.ndarray:
-    """Barrier half-widths for the three continuous policy dims.
-
-    The penalty is ``beta * sum(relu(|value| - halfwidth))``, i.e. a box
-    centred on the origin, so the half-width of dim *d* is
-    ``max(|lo|, |hi|)`` of its clamp interval.
-    """
-    return np.asarray(
-        [max(abs(CLAMP_BOX[name][0]), abs(CLAMP_BOX[name][1])) for name in CONTINUOUS_ACTION_DIMS],
-        dtype=np.float32,
-    )
-
-
-# --------------------------------------------------------------------------- #
 # Loading
 # --------------------------------------------------------------------------- #
-
-def read_rows(csv_path: Path) -> list[dict[str, str]]:
-    if not csv_path.is_file():
-        raise SystemExit(
-            f"advisor dataset missing: {csv_path}\n"
-            f"build it with: python scripts/build_advisor_dataset.py"
-        )
-    with csv_path.open("r", newline="", encoding="utf-8") as stream:
-        return list(csv.DictReader(stream))
-
 
 def _failure_flag(row: dict[str, str]) -> float:
     """Did the engine fail to deliver a usable solve?
 
     Deliberately NOT a function of ``accuracy_trusted``. That column is the
-    solve HEALTH gate -- ``apps/testlab/main.cpp:2525`` sets it to ``health_ok``,
-    and ``main.cpp:2562`` sets ``status = health_ok ? "ok" : "solve_suspect"``
+    solve HEALTH gate -- ``run_one`` (``apps/testlab/run_one.cpp``) sets it to
+    ``health_ok``, and sets ``status = health_ok ? "ok" : "solve_suspect"``
     from the same flag, so ``accuracy_trusted == false`` is exactly
     ``status == "solve_suspect"`` (verified: 144 of 144 rows on the v3 corpus).
 
@@ -855,7 +525,7 @@ def _reject_non_advisor_rows(rows: list[dict[str, str]], path: Path) -> list[dic
         return kept
     inventory = ", ".join(f"{key}={counts[key]}" for key in sorted(counts))
     expected = ", ".join(sorted(ADVISOR_ROW_SCHEMAS))
-    raise DatasetError(
+    raise SystemExit(
         f"advisor dataset has no supported rows ({expected}): {path}\n"
         f"rows by schema: {inventory} ({len(rows)} total)\n"
         f"Legacy rows have no CaseFeatures and no action vector, so every model "
@@ -898,8 +568,8 @@ def load_dataset(csv_path: Path | str | None = None,
 
     ``split`` names the hold-out grouping (see :data:`SPLIT_MODES`) and ``fold``
     selects which group block is held out. ``n_folds`` defaults to the number
-    of groups, i.e. true leave-one-group-out: with today's six families that is
-    six folds of exactly one family each.
+    of groups, i.e. true leave-one-group-out: under the default ``family`` mode
+    every fold holds out exactly one family.
     """
     path = Path(csv_path) if csv_path is not None else DATASET_CSV
     rows = read_rows(path)
@@ -1006,39 +676,6 @@ def load_dataset(csv_path: Path | str | None = None,
         n_folds=n_folds_effective,
         val_groups=fold_groups(groups, fold, n_folds_effective),
     )
-
-
-def fold_groups(groups: list[str], fold: int, n_folds: int) -> list[str]:
-    """The groups held out by ``fold``, dealt round-robin over sorted groups.
-
-    Round-robin rather than contiguous blocks: contiguous blocks over an
-    alphabetically sorted list would put related families in one fold the
-    moment the corpus grows names like ``box_hole`` / ``box_slot``.
-    """
-    if not groups:
-        return []
-    n_folds = max(1, min(int(n_folds), len(groups)))
-    fold = int(fold) % n_folds
-    return [group for i, group in enumerate(groups) if i % n_folds == fold]
-
-
-def split_mask(parts: list[str], split: str = DEFAULT_SPLIT_MODE,
-               fold: int = 0, n_folds: int | None = None) -> np.ndarray:
-    """Boolean mask selecting the validation rows of ``fold``.
-
-    Every row of a held-out group goes to validation, so no geometry -- and
-    under the default ``family`` mode no *relative* of a geometry -- straddles
-    the split.
-    """
-    groups = split_groups(parts, split)
-    if len(groups) < 2:
-        raise SystemExit(
-            f"split mode {split!r} yields {len(groups)} group(s); at least 2 are "
-            "needed to hold one out"
-        )
-    total = len(groups) if n_folds is None else int(n_folds)
-    held = set(fold_groups(groups, fold, total))
-    return np.asarray([group_of(part, split) in held for part in parts], dtype=bool)
 
 
 def _column_medians(x_train: np.ndarray, mesher_choices: list[str]) -> np.ndarray:
@@ -1200,20 +837,6 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 def load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as stream:
         return json.load(stream)
-
-
-def add_split_args(parser: Any) -> None:
-    """Attach the ``--split`` / ``--fold`` / ``--n-folds`` trio to a parser.
-
-    Shared so every entry point that reads the dataset describes the hold-out
-    the same way and cannot quietly disagree with the others.
-    """
-    parser.add_argument("--split", choices=list(SPLIT_MODES), default=DEFAULT_SPLIT_MODE,
-                        help="hold-out grouping (default: family, the only leakage-safe one)")
-    parser.add_argument("--fold", type=int, default=0,
-                        help="which group block to hold out (default: 0)")
-    parser.add_argument("--n-folds", type=int, default=None,
-                        help="fold count (default: one fold per group, i.e. leave-one-out)")
 
 
 def load_from_args(args: Any, csv_path: Path | str | None = None) -> AdvisorData:

@@ -5,14 +5,9 @@
 // facet-normal audit that says how close the rendered facets sit to the exact
 // CAD surface.
 //
-// This lives in `pipeline` rather than `fea` on purpose. The renderer's whole
-// job is to reproduce what the Studio viewport paints, so it consumes
-// `fea::tessellate_boundary_surface` (never its own surface derivation) AND the
-// `geom::CadModel` BRep for the exact-normal reference. `pipeline` is already
-// the module that owns the headless product paths `apps/gui` merely presents,
-// and it is the only core library that legitimately depends on both fea and
-// geom — putting a rasterizer inside `polymesh::fea` would push presentation
-// code into the solver library instead.
+// Lives in `pipeline` (not `fea`) because it reproduces what the Studio
+// viewport paints from `fea::tessellate_boundary_surface` and needs the
+// `geom::CadModel` BRep for the exact-normal reference.
 
 #include "fea/nodal_mesh.hpp"
 #include "fea/traction.hpp"

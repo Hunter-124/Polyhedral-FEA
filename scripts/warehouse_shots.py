@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""Render warehouse mesh.vtu → wire PNGs for a campaign (Lane V / V9b).
+"""Render warehouse mesh.vtu → wire PNGs for a campaign.
 
 Walks ``bench/campaigns/<name>/runs/**/mesh.vtu`` and writes a sibling PNG
 (``--out-name``, default ``wire.png``) via ``scripts/vtu_wire_png.py``.

@@ -6,12 +6,17 @@
 #include <format>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <string>
+#include <string_view>
 
 #if defined(__linux__)
 #include <sys/sysinfo.h>
 #elif defined(_WIN32)
+// windows.h must precede psapi.h; the blank line keeps clang-format from sorting them.
 #include <windows.h>
+
+#include <psapi.h>
 #endif
 
 namespace polymesh::fea {
@@ -55,16 +60,10 @@ std::uint64_t ldlt_factor_nnz_envelope(std::uint64_t csr_nnz, Eigen::Index nfree
         return 0;
     }
 
-    // Early element-count planning has no reduced pattern to analyze. Keep a
-    // conservative measured 3-D envelope here only; solve preflight passes the
-    // exact Gilbert-Ng-Peyton column count from analyze_solve_cost().
-    // Historical SimplicialLDLT measurements behind the envelope:
-    //   DOF       CSR nnz      strict-L nnz  L/CSR
-    //   1,536       95,832         221,289     2.31
-    //  12,288      876,024       6,242,457     7.13
-    //  41,472    3,087,000      40,885,965    13.24
-    // csr_nnz is already the larger per-element upper bound, so the growing
-    // ratio remains deliberately conservative until an exact pattern exists.
+    // Early element-count planning has no reduced pattern to analyze, so use a
+    // conservative 3-D envelope fitted to SimplicialLDLT fill (strict-L/CSR grew
+    // from ~2.3 at 1.5k DOF to ~13 at 41k DOF); csr_nnz is already an upper
+    // bound. Solve preflight passes the exact column count from analyze_solve_cost().
     const double scale = std::max(4.0, 1.8 * std::cbrt(static_cast<double>(nfree) / 1000.0));
     const long double predicted = static_cast<long double>(csr_nnz) * scale;
     const auto dense_lower = sat_mul(index_as_u64(nfree), sat_add(index_as_u64(nfree), 1)) / 2;
@@ -102,9 +101,7 @@ MemoryAvailability system_memory_available() {
     }
 #elif defined(_WIN32)
     // ullAvailPhys is the Windows analogue of MemAvailable: physical memory
-    // that can be allocated without paging. Without this branch every Windows
-    // solve fell back to the 1 GiB unknown-machine default, so its 70% cap
-    // refused any factorization above ~0.7 GiB on a 32 GiB workstation.
+    // that can be allocated without paging.
     MEMORYSTATUSEX status{};
     status.dwLength = sizeof(status);
     if (::GlobalMemoryStatusEx(&status) != 0 && status.ullAvailPhys > 0) {
@@ -114,6 +111,35 @@ MemoryAvailability system_memory_available() {
 #endif
     return {.bytes = kUnknownMemoryFallbackBytes,
             .source = MemoryAvailabilitySource::kConservativeDefault};
+}
+
+std::uint64_t peak_resident_bytes() {
+#if defined(__linux__)
+    // VmHWM is the kernel's own high-water mark for this process, so it
+    // survives the free() that follows a factorization and needs no sampling
+    // loop to catch the peak. /proc/self/status mixes textual and numeric
+    // fields, so it is read a line at a time rather than word by word.
+    std::ifstream status("/proc/self/status");
+    std::string line;
+    while (std::getline(status, line)) {
+        constexpr std::string_view kKey = "VmHWM:";
+        if (line.compare(0, kKey.size(), kKey) != 0) {
+            continue;
+        }
+        std::istringstream fields(line.substr(kKey.size()));
+        std::uint64_t value_kib = 0;
+        if (fields >> value_kib) {
+            return sat_mul(value_kib, kKiB);
+        }
+        return 0;
+    }
+#elif defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS counters{};
+    if (::GetProcessMemoryInfo(::GetCurrentProcess(), &counters, sizeof(counters)) != 0) {
+        return static_cast<std::uint64_t>(counters.PeakWorkingSetSize);
+    }
+#endif
+    return 0;
 }
 
 EffectiveMemoryBudget effective_memory_budget(double max_mem_gb) {
@@ -171,11 +197,20 @@ SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Ind
     const auto reduced_csr = csr_bytes(free_nnz, out.nfree);
     out.sparse_system_bytes = sat_add(global_csr, reduced_csr);
 
-    // At reduced-system construction the assembled global CSR, reduced
-    // Triplet vector, and compressed K_ff coexist.  Eigen::Triplet<double>
-    // stores one value and two default int indices (16 bytes on this ABI).
-    const auto reduced_triplets = sat_mul(free_nnz, sizeof(double) + 2 * sizeof(int));
-    out.assembly_workspace_bytes = sat_add(sat_add(global_csr, reduced_triplets), reduced_csr);
+    // Peak during assembly + reduction: the assembled global CSR, the
+    // connectivity pattern scratch that builds it, the bounded element-matrix
+    // chunk, and the compressed K_ff, all live at once. The pattern scratch is
+    // one uint32 per element node pair (a ninth of the DOF-level nonzero
+    // bound) plus two node-length offset arrays.
+    const auto node_pairs = out.csr_nnz_upper / 9;
+    const auto n_nodes_u = index_as_u64(out.ndof) / 3;
+    const auto pattern_scratch =
+        sat_add(sat_mul(node_pairs, sizeof(std::uint32_t)),
+                sat_mul(sat_add(n_nodes_u, 1), 2 * sizeof(std::uint64_t)));
+    // `assemble_stiffness` sizes its element-matrix scratch to this budget.
+    constexpr std::uint64_t kAssemblyChunkBytes = 32ULL << 20;
+    out.assembly_workspace_bytes = sat_add(sat_add(global_csr, pattern_scratch),
+                                           sat_add(kAssemblyChunkBytes, reduced_csr));
 
     const auto ndof_u = index_as_u64(out.ndof);
     const auto nfree_u = index_as_u64(out.nfree);

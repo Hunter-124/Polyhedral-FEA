@@ -4,6 +4,8 @@ add_library(polymesh_geom
     src/stl.cpp
     src/step.cpp
     src/cad_model.cpp
+    src/cad_projection.cpp
+    src/cad_brep_inspect.cpp
     src/cad_topology.cpp
     src/cad_geometry_features.cpp
     src/features.cpp
@@ -59,14 +61,9 @@ if(POLYMESH_WITH_OCC)
     )
     # Which STEP libraries exist depends on the OCCT generation, so the choice
     # is made from the imported target's own file location rather than from a
-    # version number. IMPORTED_LOCATION and IMPORTED_LOCATION_RELEASE are not
-    # enough: a distribution that builds OCCT RelWithDebInfo exports only
-    # IMPORTED_LOCATION_RELWITHDEBINFO, and Fedora 44's opencascade-devel
-    # 7.9.3 does exactly that. Reading those two properties alone therefore
-    # concluded "no TKDESTEP" on a 7.9 install and fell through to the 7.6
-    # TKSTEP* names, which do not exist there — the link failed with four
-    # `cannot find -lTKSTEP*` errors on a system with a perfectly good OCCT.
-    # Every configuration the target actually declares is consulted instead.
+    # version number. Every configuration the target declares is consulted:
+    # some distributions (e.g. Fedora's OCCT 7.9) export only
+    # IMPORTED_LOCATION_RELWITHDEBINFO, not IMPORTED_LOCATION[_RELEASE].
     set(_tkdestep_loc "")
     if(TARGET TKDESTEP)
         get_target_property(_tkdestep_loc TKDESTEP IMPORTED_LOCATION)

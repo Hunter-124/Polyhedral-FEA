@@ -87,10 +87,18 @@ target_link_libraries(gui_testlab_data
 
 add_executable(polymesh-gui
     main.cpp
+    automation.cpp
+    chrome.cpp
+    study_panel.cpp
+    viewport_panel.cpp
+    cinema_frame.cpp
     theme.cpp
     widgets.cpp
     viewport.cpp
-    cinema.cpp
+    cinema_timeline.cpp
+    cinema_capture.cpp
+    cinema_draw.cpp
+    cinema_strip.cpp
     live_view.cpp
     gui_settings.cpp
     process_runner.cpp

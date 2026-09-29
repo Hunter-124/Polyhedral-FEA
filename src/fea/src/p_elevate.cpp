@@ -3,9 +3,8 @@
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
 
-// determinant() on a dynamic-size product lives in the LU module. libstdc++
-// builds happened to get it transitively; clang+libc++ does not, and the failure
-// is a link error, not a compile one.
+// determinant() on a dynamic-size product lives in the LU module; it is not
+// transitive on every standard library (clang+libc++ fails at link time).
 #include <Eigen/LU>
 
 #include <array>

@@ -2,44 +2,18 @@
 
 #include "mesh/cvt_lloyd.hpp"
 
+#include "cvt_geometry.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <limits>
-#include <mutex>
-
-#if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wshadow"
-#endif
-#include "Delaunay_psm.h"
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-#endif
 
 namespace polymesh::mesh {
 namespace {
 
 #if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
 
-/// Bisector halfspace: points closer to `site` than to `other`.
-/// Keep (site - other)·(x - mid) ≥ 0.
-ClipPlane bisector_keep_site(const Eigen::Vector3d& site, const Eigen::Vector3d& other) {
-    const Eigen::Vector3d n = site - other;
-    const Eigen::Vector3d mid = 0.5 * (site + other);
-    ClipPlane pl;
-    pl.a = n.x();
-    pl.b = n.y();
-    pl.c = n.z();
-    pl.d = -n.dot(mid);
-    return pl;
-}
+using detail::bisector_keep_site;
 
 /// Build restricted Voronoi cell; returns false if empty / dead.
 bool build_rvd_cell(VBW::ConvexCell& cell, const ClipBox& box, const Eigen::Vector3d& site,
@@ -269,6 +243,7 @@ CvtLloydResult lloyd_cvt(const ClipBox& domain, std::span<const CvtSite> sites,
     }
 
 #if !(defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM)
+    (void)params;
     result.stats.geogram_ok = false;
     return result;
 #else
@@ -297,10 +272,9 @@ CvtLloydResult lloyd_cvt(const ClipBox& domain, std::span<const CvtSite> sites,
     g_edge = std::max(g_edge, 1e-9 * std::max(result.stats.domain_diag, 1e-30));
 
     // Per-site scratch: each index is written exactly once by its owning
-    // thread, then reduced serially in index order below. This replaces
-    // `reduction(max:)` (unsupported by MSVC's OpenMP 2.0 without
-    // `-openmp:llvm`) and makes the sum bit-reproducible regardless of thread
-    // count or schedule — floating-point `reduction(+)` is order-dependent.
+    // thread, then reduced serially in index order below. The sum is thus
+    // bit-reproducible for any thread count, and MSVC's OpenMP 2.0 (no
+    // `reduction(max:)`) is supported.
     std::vector<double> site_move(sites.size(), 0.0);
     std::vector<double> site_vol(sites.size(), 0.0);
 

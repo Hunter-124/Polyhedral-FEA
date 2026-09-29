@@ -32,6 +32,8 @@ from .dataset import (ACCURACY_HEADS, COST_HEADS, INPUT_COLUMNS, ORDER_CHOICES,
                       build_action_dims)
 from .model import AdvisorNet
 
+#: Vocabulary of the random benchmark batch (no dataset is read); it only
+#: sizes the mesher embedding and the policy logits.
 MESHERS = ["graded_tet", "hex", "hybrid_vem", "hybrid_zoo"]
 GEOMETRY_HEADS = ["geo_chamfer", "geo_p99"]
 RELATIVE_ACCURACY_HEADS = ["rel_err", "rel_err_rel"]

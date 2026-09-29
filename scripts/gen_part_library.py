@@ -3,10 +3,10 @@
 """Generate *legacy* validation-part STLs under tests/fixtures/parts/.
 
 ************************************************************************
-SOFT-DEPRECATED — product geometry path is STEP only (ADR-0020 / V2a/V2d).
+SOFT-DEPRECATED — product geometry path is STEP only (ADR-0020).
   Prefer:  python3 scripts/gen_cad_parts.py
-  This script only regenerates older STL campaign fixtures (smoke_bar,
-  plate_hole, cantilever) until those cases fully migrate to STEP.
+  This script only regenerates the STL fixtures older campaigns still use
+  (smoke_bar, plate_hole, cantilever).
   Do not use its outputs as the product mesh/solve geometry path.
 ************************************************************************
 
@@ -268,9 +268,9 @@ def write_plate_hole(
         faces.append(tri(p0b, p1b, p1t, outward))
         faces.append(tri(p0b, p1t, p0t, outward))
 
-    # Guard: every edge must be shared by exactly two facets. The old ray-only
-    # outer path chord-cut corners and left top/wall edges unpaired → mesh
-    # snap produced the corner fan/notch artifacts on this part.
+    # Guard: every edge must be shared by exactly two facets. A ray-only outer
+    # path chord-cuts corners and leaves top/wall edges unpaired, which makes
+    # the mesh snap produce corner fan/notch artifacts on this part.
     _assert_manifold_facets(faces)
 
     path.write_text(

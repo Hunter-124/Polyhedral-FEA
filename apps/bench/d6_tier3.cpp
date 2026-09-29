@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-// D6 Tier-3 instrument: uniform tet10 vs geometrically graded tet10 on the
-// L-domain energy problem (ADR-0005 baseline). Same assembly/solver; only the
-// mesh density strategy changes. Emits JSON (full suite + summary) to -o/stdout.
+// Tier-3 instrument for former roadmap item D6: uniform tet10 vs geometrically
+// graded tet10 on the L-domain energy problem (ADR-0005 baseline). Same
+// assembly/solver; only the mesh density strategy changes. Emits JSON (full
+// suite + summary) to -o/stdout.
 //
 // Graded path uses Babuška-style geometric layers toward the re-entrant corner
 // so h_min near the singularity can match a fine uniform mesh while far-field

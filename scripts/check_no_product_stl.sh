@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BSD-3-Clause
-# CI / local gate (Lane V / V2d, ADR-0020): product code must not *write* STL.
+# CI / local gate (ADR-0020): product code must not *write* STL.
 #
 # load_stl remains allowed for compare/legacy surfaces. Product fixtures are
 # STEP from scripts/gen_cad_parts.py (default path; --export-stl-compare only).
-# scripts/gen_part_library.py is soft-deprecated (legacy STL campaigns only).
+# scripts/gen_part_library.py writes only the legacy STL campaign fixtures.
 #
 # Usage (from repo root):
 #   ./scripts/check_no_product_stl.sh

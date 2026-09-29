@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/cell_stamp.hpp"
+#include "mesh/fill_progress.hpp"
 
 #include "geom/indicators.hpp"
 
@@ -26,6 +27,7 @@ void stamp_ball(std::vector<char>& is_marked, std::vector<char>* tag_out, int nx
     for (int dk = -r; dk <= r; ++dk) {
         for (int dj = -r; dj <= r; ++dj) {
             for (int di = -r; di <= r; ++di) {
+                fill_progress_poll();
                 const int i = i0 + di, j = j0 + dj, k = k0 + dk;
                 if (i < 0 || i >= nx || j < 0 || j >= ny || k < 0 || k >= nz) {
                     continue;
@@ -54,7 +56,10 @@ void stamp_seed_cells(std::vector<char>& is_marked, std::vector<char>* is_seed_o
     const double band2 = seed_band * seed_band;
     const double h_ref = std::max({grid.cell[0], grid.cell[1], grid.cell[2], 1e-30});
     const int r = std::max(1, static_cast<int>(std::ceil(seed_band / h_ref)) + 1);
-    for (const auto& seed : seeds) {
+    fill_progress_phase("background_seed_grading");
+    for (std::size_t work_done = 0; const auto& seed : seeds) {
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, seeds.size());
         stamp_ball(is_marked, is_seed_out, nx, ny, nz, grid, seed, band2, r);
     }
 }
@@ -69,7 +74,10 @@ void stamp_feature_cells(std::vector<char>& is_marked, std::vector<char>* is_fea
     const double band2 = feature_band * feature_band;
     const double h_ref = std::max({grid.cell[0], grid.cell[1], grid.cell[2], 1e-30});
     const int r = std::max(1, static_cast<int>(std::ceil(feature_band / h_ref)) + 1);
-    for (const auto& e : features) {
+    fill_progress_phase("background_feature_grading");
+    for (std::size_t work_done = 0; const auto& e : features) {
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, features.size());
         if (e.v0 >= surface.vertices.size() || e.v1 >= surface.vertices.size()) {
             continue;
         }
@@ -78,6 +86,7 @@ void stamp_feature_cells(std::vector<char>& is_marked, std::vector<char>* is_fea
         const double len = (b - a).norm();
         const int n_samp = std::max(2, static_cast<int>(std::ceil(len / h_ref)) + 1);
         for (int s = 0; s <= n_samp; ++s) {
+            fill_progress_poll();
             const double t = static_cast<double>(s) / static_cast<double>(n_samp);
             stamp_ball(is_marked, is_feature_out, nx, ny, nz, grid, (1.0 - t) * a + t * b,
                        band2, r);
@@ -92,7 +101,9 @@ void stamp_curvature_cells(std::vector<char>& is_l1, std::vector<char>* is_l2,
     if (!(max_turn_rad > 0.0) || nx < 1 || surface.triangles.empty()) {
         return;
     }
+    fill_progress_phase("background_curvature_estimate");
     const auto curv = geom::estimate_vertex_curvature(surface);
+    fill_progress_phase("background_curvature_grading");
     if (curv.kappa.size() < surface.vertices.size()) {
         return;
     }
@@ -129,7 +140,9 @@ void stamp_curvature_cells(std::vector<char>& is_l1, std::vector<char>* is_l2,
     // (κ_max, 0) reads half its true bending — double to drive by κ_max.
     const auto turn_of = [&](double kappa_mean_abs) { return h_ref * 2.0 * kappa_mean_abs; };
 
-    for (const auto& tri : surface.triangles) {
+    for (std::size_t work_done = 0; const auto& tri : surface.triangles) {
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, surface.triangles.size());
         const Eigen::Vector3d& a = surface.vertices[tri[0]];
         const Eigen::Vector3d& b = surface.vertices[tri[1]];
         const Eigen::Vector3d& c = surface.vertices[tri[2]];
@@ -145,6 +158,7 @@ void stamp_curvature_cells(std::vector<char>& is_l1, std::vector<char>* is_l2,
         const int n = std::clamp(static_cast<int>(std::ceil(emax / (0.5 * h_ref))), 1, 64);
         for (int u = 0; u <= n; ++u) {
             for (int v = 0; v <= n - u; ++v) {
+                fill_progress_poll();
                 const double fu = static_cast<double>(u) / static_cast<double>(n);
                 const double fv = static_cast<double>(v) / static_cast<double>(n);
                 const double fw = 1.0 - fu - fv;

@@ -5,8 +5,11 @@
 
 #include "geom/tri_surface.hpp"
 
+#include <array>
+#include <cstddef>
 #include <filesystem>
 #include <span>
+#include <vector>
 
 namespace polymesh::geom {
 
@@ -19,7 +22,7 @@ using Soup = std::vector<std::array<double, 9>>;
 /// Throws GeomError on malformed input or I/O failure.
 TriSurface load_stl(const std::filesystem::path& path);
 
-// Exposed for unit testing; prefer load_stl().
+// Exposed for unit tests and for CadModel::tessellate (weld); prefer load_stl().
 namespace detail {
 Soup parse_binary(std::span<const std::byte> bytes);
 Soup parse_ascii(std::span<const std::byte> bytes);

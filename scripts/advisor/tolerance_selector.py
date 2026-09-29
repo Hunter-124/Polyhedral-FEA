@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Is "cheapest mesh within tolerance X" deliverable? Measured, per error model.
 
-Training track 2b in ``docs/training/HANDOFF-3080ti.md`` asks for a learned
+Training track 2b in ``docs/archive/training/HANDOFF-3080ti.md`` asks for a learned
 h-selector whose deliverable is *"cheapest mesh meeting tolerance X"*. The
 selector itself needs no new head -- :func:`regret.tolerance_chooser` filters the
 candidate actions by a predicted absolute ``rel_err`` and takes the cheapest
@@ -59,7 +59,6 @@ from .crossval import (  # noqa: E402
     train_fold,
 )
 from .dataset import (  # noqa: E402
-    ADVISOR_DIR,
     SPLIT_MODES,
     AdvisorData,
     Split,
@@ -68,6 +67,7 @@ from .dataset import (  # noqa: E402
     provenance,
     split_groups,
 )
+from .paths import ADVISOR_DIR  # noqa: E402
 
 REPORT_JSON = ADVISOR_DIR / "tolerance_selector.json"
 

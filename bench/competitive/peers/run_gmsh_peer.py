@@ -513,14 +513,14 @@ def probe_vtu(
 ) -> tuple[float | None, int, int, int]:
     points, arrays = parse_vtu(path)
     # Prescribed nodes are MEASURED off the field, not re-derived from the box.
-    # This used to count every node inside `fix_box`, which stopped matching the
-    # engine when a fixture box became a selection of the boundary surface rather
-    # than of every node in a volume of space (fea::boundary_nodes_within): the
-    # interior nodes of the slab are free now, so the box rule over-counted the
-    # constrained set and under-reported active DOF on exactly the rows this
-    # matrix compares. A prescribed DOF is exactly zero in the exported field,
-    # while a free node in a loaded part is not, so counting exact zeros reads the
-    # constraint the solve actually applied, for a peer VTU as much as for ours.
+    # Counting every node inside `fix_box` does not match the engine: a fixture
+    # box selects the boundary surface, not every node in a volume of space
+    # (fea::boundary_nodes_within), so the interior nodes of the slab are free
+    # and the box rule would over-count the constrained set and under-report
+    # active DOF on exactly the rows this matrix compares. A prescribed DOF is
+    # exactly zero in the exported field while a free node in a loaded part is
+    # not, so counting exact zeros reads the constraint the solve actually
+    # applied, for a peer VTU as much as for ours.
     displacement_all = arrays.get("displacement")
     if displacement_all is None or len(displacement_all) != 3 * len(points):
         raise RuntimeError(f"{path}: missing or malformed displacement point data")
@@ -1007,10 +1007,9 @@ def run_case(
                 row["promotion"] = promotion
         rows.append(row)
 
-    # A flag that silently does nothing is the failure mode this session has hit
-    # twice in other guises, so verify the mode changed the mesh rather than
-    # trusting that it did: at the same case, h and order, uniform must promote
-    # strictly more elements than selective.
+    # A flag that silently does nothing is a known failure mode, so verify the
+    # mode changed the mesh rather than trusting that it did: at the same case,
+    # h and order, uniform must promote strictly more elements than selective.
     promoted = {
         row["solver"]: (row.get("promotion") or {}).get("n_elements_promoted")
         for row in rows

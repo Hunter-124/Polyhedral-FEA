@@ -4,7 +4,7 @@
 // the row's raw `answers` block against the CURRENT bench/reference truth, so
 // replacing truth is a seconds-long dataset rebuild instead of an hours-long
 // campaign re-run. That makes the Python a mirror of testlab's own accuracy
-// computation (apps/testlab/main.cpp: evaluate_probe + the accuracy loop), and a
+// computation (apps/testlab: evaluate_probe + the accuracy loop in run_one), and a
 // silent divergence between the two would corrupt every trained model.
 //
 // These cases pin the semantics that carry real numeric consequence: which
@@ -13,56 +13,24 @@
 // recorded is reported as unscoreable rather than quietly substituted with a
 // neighbouring field.
 
+#include "support/python_test.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 
 namespace {
 
-namespace fs = std::filesystem;
-
-// Prefer a real `python` on Windows (WindowsApps python3 may be a stub).
-const char* python_exe() {
-#if defined(_WIN32)
-    if (std::system("python -c \"import sys\" >nul 2>&1") == 0) {
-        return "python";
-    }
-    return "python3";
-#else
-    return "python3";
-#endif
-}
-
-/// Runs `body` with build_advisor_dataset importable as `bad`. Non-zero exit (an
-/// assert inside the payload) fails the test and the payload output is surfaced.
+/// Runs `body` with build_advisor_dataset importable as `bad`.
 void run_python(const std::string& name, const std::string& body) {
-    const fs::path script = fs::temp_directory_path() / (name + ".py");
-    const fs::path out = fs::temp_directory_path() / (name + ".txt");
-    {
-        std::ofstream stream(script);
-        REQUIRE(stream.good());
-        stream << "import importlib.util, sys\n"
-                  "from pathlib import Path\n"
-                  "spec = importlib.util.spec_from_file_location(\n"
-                  "    'bad', Path('scripts/build_advisor_dataset.py').resolve())\n"
-                  "bad = importlib.util.module_from_spec(spec)\n"
-                  "spec.loader.exec_module(bad)\n"
-               << body;
-    }
-    // Working directory is the repo root (catch_discover_tests WORKING_DIRECTORY).
-    const std::string cmd = std::string(python_exe()) + " \"" + script.string() + "\" > \"" +
-                            out.string() + "\" 2>&1";
-    const int rc = std::system(cmd.c_str());
-    if (rc != 0) {
-        std::ifstream in(out);
-        std::ostringstream text;
-        text << in.rdbuf();
-        FAIL("python payload failed:\n" << text.str());
-    }
+    std::string source = "import importlib.util, sys\n"
+                         "from pathlib import Path\n"
+                         "spec = importlib.util.spec_from_file_location(\n"
+                         "    'bad', Path('scripts/build_advisor_dataset.py').resolve())\n"
+                         "bad = importlib.util.module_from_spec(spec)\n"
+                         "spec.loader.exec_module(bad)\n";
+    source += body;
+    polymesh::testsupport::run_python_script(name, source);
 }
 
 } // namespace
@@ -181,12 +149,10 @@ print("ok")
 }
 
 TEST_CASE("dataset build: a re-run on the corrected engine supersedes the stale row") {
-    // THE REGRESSION. The dedup key used to include the campaign directory name,
-    // so the same (cfg_id, part, tier) re-run on a fixed engine did not collide
-    // with its predecessor and BOTH rows reached the dataset with contradictory
-    // labels. The stale row often scored better -- it was solved under a wrong
-    // load and graded against retired truth -- and a family-grouped split keeps
-    // both copies on the same side, so nothing downstream could reveal it.
+    // The dedup key is (cfg_id, part, tier), not the campaign directory, so a
+    // re-run of the same config on a corrected engine supersedes its stale
+    // predecessor instead of shipping both rows with contradictory labels. A
+    // family-grouped split keeps both copies on one side, so only this catches it.
     run_python("advisor_precedence", R"PY(
 import json, sys, tempfile, io, contextlib, csv
 from pathlib import Path

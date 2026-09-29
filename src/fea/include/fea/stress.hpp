@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Stress recovery from a displacement solution.
-//
-// Element stress is evaluated at each node's reference position and averaged
-// over incident elements for visualization. The adaptive solve path separately
-// uses Zienkiewicz–Zhu patch recovery for error estimation.
+// Stress recovery from a displacement solution: element stress evaluated at
+// each node's reference position and averaged over the elements sharing the
+// node (visualization, peak stress), per-element centroid samples (scoring),
+// and nodal scalar-gradient recovery. Error estimation uses the ZZ patch
+// recovery in zz.hpp.
 
 #include "fea/material.hpp"
 #include "fea/nodal_mesh.hpp"
@@ -28,12 +28,11 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
                                          const Eigen::VectorXd& u);
 
 /// Per-element stress at the reference centroid (interior / Gauss-like sample).
-/// kPolyVem: constant-strain LSQ fit on nodal u (VEM k=1 projector proxy) so
-/// face-mean SCF is measurable for M5 gate. `quality` is the *measured* cell
-/// shape quality from `fea::cell_quality` (see cell_quality.hpp) for **every**
-/// element type in [0,1] — 1 = regular cell, → 0 = sliver, and exactly 0 when
-/// the cell could not be measured, so a quality floor never trusts an
-/// unmeasured cell.
+/// kPolyVem: constant-strain LSQ fit on nodal u (VEM k=1 projector proxy).
+/// `quality` is the *measured* cell shape quality from `fea::cell_quality` (see
+/// cell_quality.hpp) for **every** element type in [0,1] — 1 = regular cell,
+/// → 0 = sliver, and exactly 0 when the cell could not be measured, so a
+/// quality floor never trusts an unmeasured cell.
 struct ElementCentroidStress {
     Stress stress = Stress::Zero();
     Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
@@ -63,10 +62,8 @@ double von_mises(const Stress& s);
 /// `tests/test_stress_gradient.cpp` pins), and a constant field gives exactly
 /// 0.0. On a curved field it is a *recovery*, not a derivative, and it is
 /// first-order accurate: a patch of diameter h cannot see the curvature it is
-/// averaging over. Measured on exp(x)·sin(3y)·(1+z²) over a unit-cube hex
-/// lattice, max interior error, h = 1/8 → 1/64: on the symmetric lattice the
-/// odd patch moments cancel and it converges at rate 1.80 / 1.90 / 1.95, but
-/// perturb the interior nodes by h/4 and the rate drops to 0.82 / 0.69 / 0.78.
+/// averaging over. Odd patch moments cancel on a symmetric lattice (near
+/// second order there), but on perturbed nodes the rate drops to about 0.7–0.8:
 /// O(h) is the rate to budget for on any real mesh.
 ///
 /// A 0.0 entry means one of two things, and the two are distinguishable only by

@@ -19,9 +19,6 @@
 //     shared face agree.
 //   - Tet triangular face kernels: the p=3 product is orientation-invariant;
 //     higher face multi-indices use the min-vertex origin rule.
-//
-// This is the FE half of the eventual mixed FE+VEM system (node
-// `fe-vem-assembly`); VEM polyhedra scatter into the same global matrix.
 
 #include "fea/assembly.hpp" // BodyForce
 #include "fea/hierarchical.hpp"

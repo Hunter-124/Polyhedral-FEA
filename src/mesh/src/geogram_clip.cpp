@@ -2,25 +2,11 @@
 
 #include "mesh/geogram_clip.hpp"
 
+#include "cvt_geometry.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <mutex>
-
-#if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
-// Upstream amalgam is not -Wpedantic / -Wconversion clean; silence at the include.
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wshadow"
-#endif
-#include "Delaunay_psm.h"
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-#endif
 
 namespace polymesh::mesh {
 namespace {

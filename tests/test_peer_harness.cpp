@@ -3,60 +3,19 @@
 // bench/reference/external_truth.py meshes each corpus STEP with Gmsh and
 // solves it with CalculiX to produce truth independent of this engine. Its
 // fixture selection must match the engine's own rule (ADR-0038): a fix box
-// selects the BOUNDARY nodes inside the box, never a volume of nodes — under
-// the old volume rule an element wholly inside the slab is strain-free, which
-// embeds a rigid inclusion and makes the "external" truth measure a different
+// selects the BOUNDARY nodes inside the box, never a volume of nodes — a volume
+// rule makes an element wholly inside the slab strain-free, which embeds a
+// rigid inclusion and makes the "external" truth measure a different
 // problem. The selection is inline in the harness, so this test pins the
 // extracted `fixed_boundary_nodes` against a synthetic block where the box
 // provably contains one interior node.
 
+#include "support/python_test.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
-#include <string>
-
-namespace {
-
-namespace fs = std::filesystem;
-
-const char* python_exe() {
-#if defined(_WIN32)
-    if (std::system("python -c \"import sys\" >nul 2>&1") == 0) {
-        return "python";
-    }
-    return "python3";
-#else
-    return "python3";
-#endif
-}
-
-void run_python(const std::string& name, const std::string& body) {
-    const fs::path script = fs::temp_directory_path() / (name + ".py");
-    const fs::path out = fs::temp_directory_path() / (name + ".txt");
-    {
-        std::ofstream stream(script);
-        REQUIRE(stream.good());
-        stream << body;
-    }
-    // Working directory is the repo root (catch_discover_tests WORKING_DIRECTORY).
-    const std::string cmd = std::string(python_exe()) + " \"" + script.string() + "\" > \"" +
-                            out.string() + "\" 2>&1";
-    const int rc = std::system(cmd.c_str());
-    if (rc != 0) {
-        std::ifstream in(out);
-        std::ostringstream text;
-        text << in.rdbuf();
-        FAIL("python payload failed:\n" << text.str());
-    }
-}
-
-} // namespace
-
 TEST_CASE("peer harness: a fix box selects boundary nodes, never a volume") {
-    run_python("polymesh_peer_harness_fixbox", R"PY(
+    polymesh::testsupport::run_python_script("polymesh_peer_harness_fixbox", R"PY(
 import importlib.util, sys
 from pathlib import Path
 import numpy as np

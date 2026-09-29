@@ -1,8 +1,9 @@
 # 0005 — Data card: advisor training corpus
 
 Companions: [0004 — model card](0004-model-card.md),
-[0003 — training log](0003-training-log.md),
-[ADR-0027](../decisions/0027-learned-mesh-advisor.md).
+[0003 — training log](0003-training-log.md) (historical),
+[0012 — portable-cost retrain](0012-portable-cost-retrain.md) (current
+generation), [ADR-0027](../decisions/0027-learned-mesh-advisor.md).
 
 > **Status.** The portable-cost regeneration has **landed**. The final table is
 > **36,010 rows, `dataset.csv` SHA-256 `f0a5c150c275…`**, with 15,578
@@ -57,6 +58,9 @@ is in `bench/advisor/evidence/corpus_evidence.json`; the gate reads that file
 rather than prose.
 
 ### `tube` is the hardest family in the corpus, and four measurements say so
+
+> Measured on the earlier 8-family corpora (32 and 44 corpus parts); the counts
+> are not re-derived for the 15-family portable-cost corpus.
 
 Four independent findings land on the same family. They are collected here rather
 than left as one line in each of three documents, because they are not four
@@ -130,7 +134,7 @@ reproduce the leakage it causes and must never ship a number.
 
 | head | source | notes |
 |---|---|---|
-| predicted relative error (`rel_err`) | `accuracy_rel_err` vs the case reference | now an independent Gmsh + CalculiX value for 64 cases; 8 remain closed-form |
+| predicted relative error (`rel_err`) | `accuracy_rel_err` vs the case reference | independent Gmsh + CalculiX value for 256 cases; 8 closed-form; 36 protected pre-existing provisional references |
 | relative error, centred per part (`rel_err_rel`) | per-case-centred `rel_err` | what the choosers rank on |
 | mesh-to-CAD distance and worst 1% (`geo_chamfer`, `geo_p99`) | mesh-vs-BRep distance | `p95` collapses to ~0 on conforming meshes and carries no signal |
 | degrees of freedom, meshing time, solve time (`dof`, `mesh_ms`, `solve_ms`) | measured | independent of the reference |
@@ -140,8 +144,8 @@ reproduce the leakage it causes and must never ship a number.
 | failure risk (`failure`) | `status` / `error` | see below |
 
 **Feasibility and trust are separate, and conflating them was a real defect.**
-`accuracy_trusted` is the solve *health gate* — `apps/testlab/main.cpp:2525` sets
-it from `health_ok`, and `main.cpp:2562` derives `status` from the same flag, so
+`accuracy_trusted` is the solve *health gate* — testlab sets it from `health_ok`
+and derives `status` from the same flag, so
 `accuracy_trusted == false` is exactly `status == "solve_suspect"` (verified 144
 of 144 rows). The loader previously treated that as a *failure*, which
 (a) taught the feasibility head the wrong event and (b) discarded those rows'
@@ -163,20 +167,21 @@ input the model also sees, and nothing in the schema says so.
 Two code paths:
 
 - **`adapt_passes = 0`** — promotion is unconditional.
-  `apps/testlab/main.cpp:2391-2392` calls `fea::promote_to_quadratic` on the
+  testlab calls `fea::promote_to_quadratic` on the
   whole mesh, so **every** promotable linear element becomes quadratic. The mesh
   is uniformly quadratic.
 - **`adapt_passes > 0`** — promotion routes through `SolveJob`, where the p-set
   comes from the adaptive driver and falls back to
-  `adapt::mark_smooth(zz.element_eta, 0.3)`
-  (`src/pipeline/src/scene.cpp:4408`). Only ZZ-smooth-marked elements are
+  `adapt::mark_smooth(zz.element_eta, 0.3)` in the pipeline's adaptive solve
+  path. Only ZZ-smooth-marked elements are
   promoted, so the mesh is **mixed-p** and the quadratic fraction varies per case
   and per mesh because it depends on the error field. That path never consults
   `cfg.order`.
 
 ### How the corpus splits, and what it costs
 
-Historical v6 measurement on its 2,412-row dataset (SHA `3c0d6bd7a7d3…`):
+Historical v2-era measurement (the corpus before [0006](0006-clean-data-retrain.md))
+on its 2,412-row dataset (SHA `3c0d6bd7a7d3…`):
 
 | element order (`order`) | refinement passes (`adapt_passes`) | rows | share |
 |---|---|---:|---:|
@@ -220,8 +225,9 @@ actually honoured.
   uninformative; it dilutes the learned order effect toward zero.
 - It also costs compute: 2,520 s of mesh+solve went to the redundant half of
   those pairs. Crossing `order` with `adapt_passes ≥ 1` in a campaign grid buys
-  duplicate rows, which is why the shipped `candidate_grid` collapses that dial
-  and enumerates 20 actions rather than 26.
+  duplicate rows, which is why `candidate_grid` collapses that dial
+  (`order_collapsed_when_adapt_passes_positive` in `clamps.json`); the v2-era
+  grid enumerated 20 actions rather than 26.
 - The rows are still worth keeping. Same configuration, separate execution makes
   them usable **measurement-noise replicates**, which the corpus otherwise has
   none of — provided they are labelled honestly rather than read as an order
@@ -237,15 +243,15 @@ schema, is future work; see the model card's limitations.
 
 ## Known defects in the features
 
-> Counts in this subsection are the historical v6 **2,412-row** table
+> Counts in this subsection are the historical v2-era **2,412-row** table
 > (`3c0d6bd7a7d3…`). Current portable-cost counts are at the top of this card;
 > re-derive them with `python scripts/advisor/dataset.py`.
 
-**Six of the 58 candidate input columns were constant** on that v6 corpus and
+**Six of the 58 candidate input columns were constant** on that v2-era corpus and
 therefore carry no information:
 
 `diag` (1.0 by construction), **`curved_frac` (1.0 in every row — its formula
-`(ntri-12)/ntri` at `apps/testlab/main.cpp:1709` saturates for any real
+`(ntri-12)/ntri` in testlab's feature extraction saturates for any real
 triangulation)**, `poisson`, `case_poisson`, `case_n_fix_regions`,
 `case_n_load_regions`.
 
@@ -259,7 +265,7 @@ instructive about which fixes worked:
   were flagged as "re-check when the pack completes" rather than recorded as dead
   inputs, and that caution was justified.
 - `p_elevate` is gone from the schema entirely. It was redundant, not merely
-  unvaried: `apps/cli/main.cpp:805` computes
+  unvaried: `polymesh solve` computes
   `p_elevate = decision.p_elevate || order >= 2`, the same actuator. The order
   vocabulary was trimmed from `[1,2,3,4]` to `[1,2]` for the same reason; orders
   3 and 4 were unreachable and the engine warned and downgraded.
@@ -268,38 +274,42 @@ instructive about which fixes worked:
   saturates. Both are superseded in practice by the offline descriptors.
 
 The 15 offline descriptors in `geometry_features.csv` were built to replace the
-dead geometry signal. They do vary (`curved_area_frac` spans 0.000–0.986), but
-see the model card: they did not improve transfer and are now used for OOD
-detection instead.
+dead geometry signal. They do vary (`curved_area_frac` spans 0.000–0.986). In
+the v2-era measurement they did not improve transfer and were used for OOD
+detection only; the portable-cost contract includes them as model inputs and
+keeps them in the OOD vector (see the model card).
 
 ## Action grid
 
 The grid the campaign sweeps is the support of every action column, and the model
-must never be asked to extrapolate beyond it. **Final support:**
-`h_rel {0.08, 0.09, 0.12, 0.16}` × `order {1,2}` ×
-`mesher {graded_tet, hybrid_zoo}` × `adapt_passes {0,1,2}` ×
-`eta_target {0, 0.005, 0.02, 0.05}`.
+must never be asked to extrapolate beyond it. **Current support**
+(`clamps.json:candidate_grid.observed_levels`): `h_rel {0.05, 0.06, 0.08, 0.10,
+0.12, 0.14, 0.18, 0.20, 0.28}` × `order {1,2}` ×
+`mesher {graded_tet, hex, hybrid_vem, hybrid_zoo}` × `adapt_passes {0,1,2}` ×
+`eta_target {0, 0.005, 0.02, 0.05}`, enumerated as **108 measured action tuples**
+— a list, not a cross product of per-dial levels — so every action a deployed
+chooser enumerates is one the model has actually seen.
 
-The previous grid was `h_rel {0.12, 0.16, 0.20}` while the clamp box allowed
-`h_rel` down to 0.005 — so the policy could legally emit an action **24× finer
-than anything ever measured**, and the M-A1 log records what that produced
+History, v2-era: the support was `h_rel {0.08, 0.09, 0.12, 0.16}` ×
+`order {1,2}` × `mesher {graded_tet, hybrid_zoo}` × `adapt_passes {0,1,2}` ×
+`eta_target {0, 0.005, 0.02, 0.05}` with 20 tuples. The grid before that was
+`h_rel {0.12, 0.16, 0.20}` while the clamp box allowed `h_rel` down to 0.005 —
+so the policy could legally emit an action **24× finer than anything ever
+measured**, and the M-A1 log records what that produced
 (`predicted_dof = 1.5e15`).
 
-**Grid saturation was the reason for re-aiming, and it is measurably fixed.** On
-the previous corpus the finest offered `h_rel` was the accuracy optimum for
+**Grid saturation was the reason for re-aiming, and it was measurably fixed.**
+On the earlier corpus the finest offered `h_rel` was the accuracy optimum for
 **81 % of cases (51/63)** — the grid was saturated at its own edge, so a
-pure-accuracy objective was degenerate and there was no headroom for any policy to
-find. After extending the grid downward the finest rung is optimal for only
-**49 % (35/72)**, so the interesting region is now inside the sampled range rather
-than beyond it. Evaluation remains budget-constrained and efficiency-based.
-
-`clamps.json` carries an explicit `candidate_grid` of **20 measured action
-tuples** — a list, not a cross product of per-dial levels — so every action a
-deployed chooser enumerates is one the model has actually seen.
+pure-accuracy objective was degenerate and there was no headroom for any policy
+to find. After extending the grid downward the finest rung was optimal for only
+**49 % (35/72)**, so the interesting region moved inside the sampled range
+rather than beyond it. Evaluation remains budget-constrained and
+efficiency-based.
 
 ## Coverage and gaps
 
-- **72 of 96 cases had ≥3 measured actions.** `tube` is the family that
+- **v2-era: 72 of 96 cases had ≥3 measured actions.** `tube` is the family that
   contributes **zero** scorable cases under leave-one-family-out, so macro means
   are over **7 families, not 8**. The harness prints a warning saying so. Note
   this is a different family from the previous corpus, where `channel` was the
@@ -320,7 +330,7 @@ finding worth acting on**, that yield *improves* toward coarser meshes — quote
 conclusion that "fine rungs are cheaper per *usable* row than their per-row cost
 suggests". **That claim is withdrawn. The trend runs the other way.**
 
-Measured on the final corpus:
+Measured on the v2-era corpus:
 
 | cell size, as a fraction of the part (`h_rel`) | rows | usable |
 |---|---:|---:|

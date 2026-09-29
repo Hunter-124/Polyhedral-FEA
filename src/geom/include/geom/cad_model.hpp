@@ -54,10 +54,21 @@ class CadModel {
     [[nodiscard]] TriSurface tessellate(double deflection = 0.0,
                                         double angular_deflection = 0.0) const;
 
-    /// Alias used by hybrid_zoo until it is fully BRep-native (ADR-0020).
+    /// Alias for `tessellate(deflection)` kept for legacy hybrid-fill callers (ADR-0020).
     [[nodiscard]] TriSurface boundary_surface_for_legacy_fill(double deflection = 0.0) const {
         return tessellate(deflection);
     }
+
+    /// Uniformly scaled copy of the retained BRep about the world origin.
+    ///
+    /// The single conversion point for a part authored in units other than
+    /// metres: `scaled(0.001)` turns a millimetre STEP into the metre geometry
+    /// the rest of the library assumes (see the class note above). The BRep is
+    /// deep-copied (`BRepBuilderAPI_Transform` with `Copy=true`), so the source
+    /// model — which shares its `Impl` with every other handle to it — is
+    /// untouched, and the returned model's bbox is recomputed from the scaled
+    /// shape. `factor` must be finite and positive; 1.0 returns an equal copy.
+    [[nodiscard]] CadModel scaled(double factor) const;
 
     /// Opaque OCC shape accessor for mesher code compiled with OCC.
     /// Returns nullptr when empty or without OCC.
@@ -69,8 +80,6 @@ class CadModel {
     std::string name_;
     Eigen::Vector3d bbox_min_ = Eigen::Vector3d::Zero();
     Eigen::Vector3d bbox_max_ = Eigen::Vector3d::Zero();
-
-    void compute_bbox();
 };
 /// Stable topological owner of an exact BRep projection. IDs are zero-based
 /// and follow the same TopExp::MapShapes order used by CadTopology. Degenerate

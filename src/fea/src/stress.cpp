@@ -5,6 +5,7 @@
 #include "fea/cell_quality.hpp"
 #include "fea/shape.hpp"
 #include "fea/vem.hpp"
+#include "recovered_strain.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -30,8 +31,7 @@ namespace {
 /// the consistency term of `vem_poly_stiffness` integrates, so σ = D ε(Π u) is
 /// the stress the element actually carries. Scattering it to every vertex of the
 /// cell and averaging there matches what the isoparametric path does with its
-/// nodal samples, so an all-VEM mesh gets the same nodal-averaged field instead
-/// of the zeros it used to report.
+/// nodal samples, so an all-VEM mesh gets the same nodal-averaged field.
 Stress poly_vem_cell_stress(const NodalMesh& mesh, const NodalElement& element,
                             const Eigen::Matrix<double, 6, 6>& d, const Eigen::VectorXd& u) {
     const auto n = element.nodes.size();
@@ -45,6 +45,43 @@ Stress poly_vem_cell_stress(const NodalMesh& mesh, const NodalElement& element,
     }
     const int order = vem_infer_order(n, element.faces);
     return d * vem_projected_strain(coords, element.faces, u_elem, order);
+}
+
+/// Adds `element`'s stress samples into `stress` and counts them in `hits`, per
+/// node: the cell stress for kPolyVem, otherwise the element stress evaluated at
+/// each node's reference position.
+void accumulate_nodal_stress(const NodalMesh& mesh, const NodalElement& element,
+                             const Eigen::Matrix<double, 6, 6>& d, const Eigen::VectorXd& u,
+                             std::vector<Stress>& stress, std::vector<int>& hits) {
+    if (element.type == ElementType::kPolyVem) {
+        if (element.nodes.empty() || element.faces.empty()) {
+            return;
+        }
+        const Stress s = poly_vem_cell_stress(mesh, element, d, u);
+        if (!s.allFinite()) {
+            return;
+        }
+        for (std::uint32_t nid : element.nodes) {
+            stress[nid] += s;
+            ++hits[nid];
+        }
+        return;
+    }
+    const auto ref = reference_nodes(element.type);
+    Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
+    for (std::size_t a = 0; a < element.nodes.size(); ++a) {
+        x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[element.nodes[a]].transpose();
+    }
+    for (std::size_t a = 0; a < element.nodes.size(); ++a) {
+        const auto shape = eval_shape(element.type, ref[a]);
+        const Eigen::Matrix3d jac = shape.dn.transpose() * x;
+        const Eigen::Matrix3d jac_inv = jac.inverse();
+        const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = shape.dn * jac_inv.transpose();
+        const Eigen::Matrix<double, 6, 1> eps =
+            detail::strain_from_gradients(element, dndx, u);
+        stress[element.nodes[a]] += d * eps;
+        ++hits[element.nodes[a]];
+    }
 }
 
 } // namespace
@@ -73,48 +110,8 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
         auto& local_h = thr_hits[static_cast<std::size_t>(tid)];
 #pragma omp for schedule(static)
         for (std::ptrdiff_t e = 0; e < static_cast<std::ptrdiff_t>(n_elem); ++e) {
-            const auto& element = mesh.elements[static_cast<std::size_t>(e)];
-            if (element.type == ElementType::kPolyVem) {
-                if (element.nodes.empty() || element.faces.empty()) {
-                    continue;
-                }
-                const Stress s = poly_vem_cell_stress(mesh, element, d, u);
-                if (!s.allFinite()) {
-                    continue;
-                }
-                for (std::uint32_t nid : element.nodes) {
-                    local_s[nid] += s;
-                    ++local_h[nid];
-                }
-                continue;
-            }
-            const auto ref = reference_nodes(element.type);
-            Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
-            for (std::size_t a = 0; a < element.nodes.size(); ++a) {
-                x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[element.nodes[a]].transpose();
-            }
-            for (std::size_t a = 0; a < element.nodes.size(); ++a) {
-                const auto shape = eval_shape(element.type, ref[a]);
-                const Eigen::Matrix3d jac = shape.dn.transpose() * x;
-                const Eigen::Matrix3d jac_inv = jac.inverse();
-                const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx =
-                    shape.dn * jac_inv.transpose();
-
-                Eigen::Matrix<double, 6, 1> eps = Eigen::Matrix<double, 6, 1>::Zero();
-                for (std::size_t b = 0; b < element.nodes.size(); ++b) {
-                    const auto bi = static_cast<Eigen::Index>(b);
-                    const Eigen::Vector3d ub =
-                        u.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[b]));
-                    eps[0] += dndx(bi, 0) * ub[0];
-                    eps[1] += dndx(bi, 1) * ub[1];
-                    eps[2] += dndx(bi, 2) * ub[2];
-                    eps[3] += dndx(bi, 2) * ub[1] + dndx(bi, 1) * ub[2];
-                    eps[4] += dndx(bi, 2) * ub[0] + dndx(bi, 0) * ub[2];
-                    eps[5] += dndx(bi, 1) * ub[0] + dndx(bi, 0) * ub[1];
-                }
-                local_s[element.nodes[a]] += d * eps;
-                ++local_h[element.nodes[a]];
-            }
+            accumulate_nodal_stress(mesh, mesh.elements[static_cast<std::size_t>(e)], d, u,
+                                    local_s, local_h);
         }
     }
     for (std::size_t t = 0; t < thr_stress.size(); ++t) {
@@ -125,47 +122,7 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
     }
 #else
     for (const auto& element : mesh.elements) {
-        if (element.type == ElementType::kPolyVem) {
-            if (element.nodes.empty() || element.faces.empty()) {
-                continue;
-            }
-            const Stress s = poly_vem_cell_stress(mesh, element, d, u);
-            if (!s.allFinite()) {
-                continue;
-            }
-            for (std::uint32_t nid : element.nodes) {
-                stress[nid] += s;
-                ++hits[nid];
-            }
-            continue;
-        }
-        const auto ref = reference_nodes(element.type);
-        Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
-        for (std::size_t a = 0; a < element.nodes.size(); ++a) {
-            x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[element.nodes[a]].transpose();
-        }
-        for (std::size_t a = 0; a < element.nodes.size(); ++a) {
-            const auto shape = eval_shape(element.type, ref[a]);
-            const Eigen::Matrix3d jac = shape.dn.transpose() * x;
-            const Eigen::Matrix3d jac_inv = jac.inverse();
-            const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx =
-                shape.dn * jac_inv.transpose();
-
-            Eigen::Matrix<double, 6, 1> eps = Eigen::Matrix<double, 6, 1>::Zero();
-            for (std::size_t b = 0; b < element.nodes.size(); ++b) {
-                const auto bi = static_cast<Eigen::Index>(b);
-                const Eigen::Vector3d ub =
-                    u.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[b]));
-                eps[0] += dndx(bi, 0) * ub[0];
-                eps[1] += dndx(bi, 1) * ub[1];
-                eps[2] += dndx(bi, 2) * ub[2];
-                eps[3] += dndx(bi, 2) * ub[1] + dndx(bi, 1) * ub[2];
-                eps[4] += dndx(bi, 2) * ub[0] + dndx(bi, 0) * ub[2];
-                eps[5] += dndx(bi, 1) * ub[0] + dndx(bi, 0) * ub[1];
-            }
-            stress[element.nodes[a]] += d * eps;
-            ++hits[element.nodes[a]];
-        }
+        accumulate_nodal_stress(mesh, element, d, u, stress, hits);
     }
 #endif
     for (std::size_t i = 0; i < stress.size(); ++i) {
@@ -313,30 +270,15 @@ std::vector<ElementCentroidStress> recover_element_centroid_stress(const NodalMe
         const Eigen::Matrix3d jac_inv = jac.inverse();
         const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = shape.dn * jac_inv.transpose();
 
-        Eigen::Matrix<double, 6, 1> eps = Eigen::Matrix<double, 6, 1>::Zero();
-        for (std::size_t b = 0; b < element.nodes.size(); ++b) {
-            const auto bi = static_cast<Eigen::Index>(b);
-            const Eigen::Vector3d ub =
-                u.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[b]));
-            eps[0] += dndx(bi, 0) * ub[0];
-            eps[1] += dndx(bi, 1) * ub[1];
-            eps[2] += dndx(bi, 2) * ub[2];
-            eps[3] += dndx(bi, 2) * ub[1] + dndx(bi, 1) * ub[2];
-            eps[4] += dndx(bi, 2) * ub[0] + dndx(bi, 0) * ub[2];
-            eps[5] += dndx(bi, 1) * ub[0] + dndx(bi, 0) * ub[1];
-        }
+        const Eigen::Matrix<double, 6, 1> eps =
+            detail::strain_from_gradients(element, dndx, u);
 
         ElementCentroidStress sample;
         sample.stress = dmat * eps;
         sample.centroid = centroid;
         sample.element_index = ei;
-        // Was `std::abs(det)`: |det J| at a single reference point, with the
-        // reference domain's own measure dropped. Exact for tet4 only because
-        // the line below overrode it, and coincidentally exact for prism6
-        // (reference volume 1); 0.125x true for hex8/hex20 and a non-constant
-        // ~0.09x for pyramid5. Nothing read `.volume` yet, so it never reached
-        // the advisor's labels, but a volume-weighted average over these
-        // samples would have been silently wrong per element type.
+        // True cell volume; |det J| at one reference point would drop the
+        // reference-domain measure (0.125x for a hex).
         sample.volume = element_volume(mesh, element);
         sample.quality = sample_quality(mesh, element);
         out.push_back(sample);
@@ -359,12 +301,8 @@ std::vector<double> nodal_scalar_gradient_magnitude(const NodalMesh& mesh,
         return magnitude;
     }
 
-    // Node -> incident element adjacency, CSR (counts, prefix sum, fill). The
-    // per-node patch is otherwise a scan of every element, which is O(N·E).
-    // Measured on a uniform hex lattice: 20³ (9261 nodes, 8000 elements) takes
-    // 2.3 ms through this table against 232 ms for a per-node element scan
-    // doing the same patch assembly and 3×3 eigensolve, and 50³ (132651 nodes)
-    // takes 34 ms, where the scan's work is another 220× larger.
+    // Node -> incident element adjacency, CSR (counts, prefix sum, fill), so each
+    // patch costs its valence rather than a scan of every element (O(N·E)).
     std::vector<std::size_t> offset(n_nodes + 1, 0);
     for (const auto& element : mesh.elements) {
         for (const std::uint32_t node : element.nodes) {
@@ -388,19 +326,10 @@ std::vector<double> nodal_scalar_gradient_magnitude(const NodalMesh& mesh,
         }
     }
 
-    // Rank floor on λ_min/λ_max of the 3×3 normal matrix. Measured on patches
-    // rotated off the axes, so a null direction is a cancellation of three
-    // nonzero rows rather than an exactly zero row — the hard case:
-    //   - rank-deficient (collinear tet, coplanar tet, one-cell-thick lattice
-    //     from 2×2 to 16×16): |ratio| ≤ 2.4e-16, and it comes out *negative*
-    //     as often as positive, so the test is written as a strict `>`;
-    //   - thin but genuinely three-dimensional: a 1000:1 flattened hex lattice
-    //     sits at 4.4e-7 and recovers a linear field to 7.5e-12 relative, a
-    //     10000:1 one at 4.4e-9 and 5.5e-9 relative;
-    //   - well shaped: structured hex 0.12…0.25, Kuhn tet 0.10.
-    // 1e-10 sits in the gap: six decades above the round-off a rank-deficient
-    // patch produces, one decade below the flattest patch measured that still
-    // recovers a real slope.
+    // Rank floor on λ_min/λ_max of the 3×3 normal matrix. Rank-deficient patches
+    // (collinear, coplanar, one cell thick) give |ratio| ≤ 2.4e-16 of either sign,
+    // hence the strict `>`; genuinely 3-D patches as thin as 10000:1 sit near
+    // 4.4e-9 and still recover a real slope. 1e-10 sits in the gap.
     constexpr double kRankFloor = 1e-10;
 
     // `stamp[j] == i` marks node j as already in node i's patch, so a neighbour
@@ -415,9 +344,8 @@ std::vector<double> nodal_scalar_gradient_magnitude(const NodalMesh& mesh,
     for (std::size_t i = 0; i < n_nodes; ++i) {
         const Eigen::Vector3d& xi = mesh.nodes[i];
         const double si = nodal[i];
-        // Offsets are taken from x_i, not from the global origin: posing the fit
-        // in absolute coordinates is what made the ZZ patch fit rank deficient
-        // for a mesh sitting far from the origin (see zz.cpp).
+        // Offsets are taken from x_i, not the global origin, so the fit stays
+        // well conditioned far from the origin (same reason as in zz.cpp).
         Eigen::Matrix3d normal_matrix = Eigen::Matrix3d::Zero();
         Eigen::Vector3d rhs = Eigen::Vector3d::Zero();
         std::size_t patch_size = 0;

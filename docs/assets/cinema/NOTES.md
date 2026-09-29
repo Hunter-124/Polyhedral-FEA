@@ -9,7 +9,7 @@ function behind it, and every disclosure that used to be stacked six deep in 13 
 grey are here.
 
 Nothing in the film is a mock-up. It is recorded from the GUI's own framebuffer by
-`polymesh-gui --auto` (`apps/gui/cinema.cpp`), driven by
+`polymesh-gui --auto` (`apps/gui/cinema_*.cpp`, `cinema_frame.cpp`, `automation.cpp`), driven by
 [`scripts/render_cinema.py`](../../../scripts/render_cinema.py), which also writes
 `manifest.json` beside the video with the exact command, the encoder, the frame
 geometry read out of the first PNG's IHDR, and every number the GUI printed on
@@ -506,8 +506,10 @@ and bottom ledger rather than another prose panel.
 The recorder prints a `solver` token and the manifest records it.
 
 `fea::SolveOptions::on_note` is the authoritative channel. CG names itself and
-its convergence there; direct solves emit `direct LDLT selected for N free
-DOFs`. That note lives on the `SolveResult` it describes, so the final quadratic
+its convergence there; a direct solve emits `direct solve selected for N free
+DOFs (estimated footprint …, cap …)` followed by the factorization rung that
+actually produced the answer (`direct solve: CholmodSupernodalLLT`, or the
+`SimplicialLDLT(AMD)` / `SparseLU(COLAMD)` fallback it fell through to). That note lives on the `SolveResult` it describes, so the final quadratic
 re-solve replaces the linear pass's provenance instead of inheriting or losing it.
 
 ## The active-equation graph

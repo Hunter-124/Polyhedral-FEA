@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/tet_fill.hpp"
+#include "mesh/fill_progress.hpp"
 
 #include "mesh/cell_validity.hpp"
 #include "mesh/grid_classify.hpp"
@@ -18,22 +19,15 @@
 #include <unordered_map>
 
 namespace polymesh::mesh {
-namespace {
-
-double tet_signed_volume_impl(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
-                              const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    return (b - a).dot((c - a).cross(d - a)) / 6.0;
-}
-
-} // namespace
 
 double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                          const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    return tet_signed_volume_impl(a, b, c, d);
+    return validity::tet_signed_volume(a, b, c, d);
 }
 
 void check_tet_fill_geometry(const TetFillOutput& out, double min_volume) {
     for (std::size_t e = 0; e < out.tets.size(); ++e) {
+        fill_progress_poll(e, out.tets.size());
         const auto& n = out.tets[e];
         for (const auto idx : n) {
             if (idx >= out.nodes.size()) {
@@ -45,8 +39,8 @@ void check_tet_fill_geometry(const TetFillOutput& out, double min_volume) {
                     std::format("check_tet_fill_geometry: tet {} non-finite node", e));
             }
         }
-        const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
-                                                out.nodes[n[2]], out.nodes[n[3]]);
+        const double v = validity::tet_signed_volume(out.nodes[n[0]], out.nodes[n[1]],
+                                                     out.nodes[n[2]], out.nodes[n[3]]);
         if (v <= min_volume) {
             throw ValidityError(std::format(
                 "check_tet_fill_geometry: tet {} non-positive volume {:.3e}", e, v));
@@ -66,6 +60,7 @@ std::vector<FreeTetFace> free_tet_faces(std::span<const std::array<std::uint32_t
     static constexpr int kTF[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
     std::map<std::array<std::uint32_t, 3>, std::pair<int, std::uint32_t>> census;
     for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+        fill_progress_poll(ti, tets.size());
         for (const auto& f : kTF) {
             std::array<std::uint32_t, 3> key{{tets[ti][static_cast<std::size_t>(f[0])],
                                               tets[ti][static_cast<std::size_t>(f[1])],
@@ -78,6 +73,7 @@ std::vector<FreeTetFace> free_tet_faces(std::span<const std::array<std::uint32_t
     }
     std::vector<FreeTetFace> free;
     for (const auto& [key, slot] : census) {
+        fill_progress_poll();
         if (slot.first == 1) {
             free.push_back({key, slot.second});
         }
@@ -92,6 +88,7 @@ class TetGrid {
             std::span<const std::array<std::uint32_t, 4>> tets, double cell)
         : nodes_(nodes), tets_(tets), cell_(cell) {
         for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+            fill_progress_poll(ti, tets.size());
             Eigen::Vector3d lo = nodes[tets[ti][0]];
             Eigen::Vector3d hi = lo;
             for (int k = 1; k < 4; ++k) {
@@ -103,6 +100,7 @@ class TetGrid {
             for (long long i = a[0]; i <= b[0]; ++i) {
                 for (long long j = a[1]; j <= b[1]; ++j) {
                     for (long long k = a[2]; k <= b[2]; ++k) {
+                        fill_progress_poll();
                         buckets_[pack(i, j, k)].push_back(static_cast<std::uint32_t>(ti));
                     }
                 }
@@ -113,10 +111,9 @@ class TetGrid {
     /// Index of a tet strictly containing `p` other than `owner` — the
     /// burying tet. SIZE_MAX when none. Tets sharing nodes with `face` are
     /// deliberately NOT excluded: at a concave crease the two crossed sheets
-    /// usually share the crease nodes, and excluding node-sharers hid exactly
-    /// the 9 flipped faces on icecream_cone's junction ring. Healthy adjacency
-    /// is already excluded by the strict barycentric floor — a centroid ON a
-    /// neighbour's face has a ~0 coordinate and never counts.
+    /// usually share the crease nodes. Healthy adjacency is already excluded by
+    /// the strict barycentric floor — a centroid ON a neighbour's face has a ~0
+    /// coordinate and never counts.
     std::size_t buried_in(const Eigen::Vector3d& p, const std::array<std::uint32_t, 3>& face,
                           std::uint32_t owner) const {
         (void)face;
@@ -126,6 +123,7 @@ class TetGrid {
             return SIZE_MAX;
         }
         for (const auto ti : it->second) {
+            fill_progress_poll();
             if (ti == owner) {
                 continue;
             }
@@ -151,7 +149,8 @@ class TetGrid {
     bool strictly_inside(const Eigen::Vector3d& p,
                          const std::array<std::uint32_t, 4>& t) const {
         const Eigen::Vector3d& a = nodes_[t[0]];
-        const double v = tet_signed_volume_impl(a, nodes_[t[1]], nodes_[t[2]], nodes_[t[3]]);
+        const double v =
+            validity::tet_signed_volume(a, nodes_[t[1]], nodes_[t[2]], nodes_[t[3]]);
         if (!(v > 0.0)) {
             return false;
         }
@@ -159,15 +158,15 @@ class TetGrid {
         // floor. A centroid ON a shared face (healthy adjacency) has one
         // coordinate ~0 and MUST NOT count as buried.
         const double tol = 1e-6;
-        const double l1 = tet_signed_volume_impl(a, p, nodes_[t[2]], nodes_[t[3]]) / v;
+        const double l1 = validity::tet_signed_volume(a, p, nodes_[t[2]], nodes_[t[3]]) / v;
         if (l1 < tol) {
             return false;
         }
-        const double l2 = tet_signed_volume_impl(a, nodes_[t[1]], p, nodes_[t[3]]) / v;
+        const double l2 = validity::tet_signed_volume(a, nodes_[t[1]], p, nodes_[t[3]]) / v;
         if (l2 < tol) {
             return false;
         }
-        const double l3 = tet_signed_volume_impl(a, nodes_[t[1]], nodes_[t[2]], p) / v;
+        const double l3 = validity::tet_signed_volume(a, nodes_[t[1]], nodes_[t[2]], p) / v;
         if (l3 < tol) {
             return false;
         }
@@ -186,6 +185,7 @@ buried_face_ids(std::span<const Eigen::Vector3d> nodes, const std::vector<FreeTe
                 const TetGrid& grid) {
     std::vector<std::pair<std::size_t, std::size_t>> out;
     for (std::size_t fi = 0; fi < free.size(); ++fi) {
+        fill_progress_poll(fi, free.size());
         const auto& f = free[fi];
         const Eigen::Vector3d c =
             (nodes[f.nodes[0]] + nodes[f.nodes[1]] + nodes[f.nodes[2]]) / 3.0;
@@ -238,26 +238,25 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
     const auto free = free_tet_faces(tets);
     std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> star;
     for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+        fill_progress_poll(ti, tets.size());
         for (const auto ni : tets[ti]) {
             star[ni].push_back(static_cast<std::uint32_t>(ti));
         }
     }
     const auto star_ok = [&](std::uint32_t ni) {
         for (const auto ti : star[ni]) {
+            fill_progress_poll();
             const auto& t = tets[ti];
-            if (tet_signed_volume_impl(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]) <=
-                0.0) {
+            if (validity::tet_signed_volume(nodes[t[0]], nodes[t[1]], nodes[t[2]],
+                                            nodes[t[3]]) <= 0.0) {
                 return false;
             }
         }
         return true;
     };
     // This pass pulls nodes inward one at a time under a validity gate, so it is
-    // order-dependent like every other accept/reject pass. Measured on plate_hole
-    // at h = 6 mm with the mesher otherwise exactly symmetric, it pulled one
-    // box-corner node 2.4 mm off its pinned CAD vertex and left the mirror image
-    // where it was: 2 nodes and 8 tets lost their mirror. Each pull is therefore
-    // applied to the node's whole reflection orbit or to none of it.
+    // order-dependent like every other accept/reject pass. Each pull is therefore
+    // applied to the node's whole reflection orbit or to none of it (ADR-0036).
     const MirrorNodeOrbit orbit(mirror != nullptr ? *mirror : MirrorFrame{}, nodes, [&] {
         const MirrorKeyFrame frame = mirror_key_frame(nodes);
         return frame.inv_quantum > 0.0 ? 1.0 / frame.inv_quantum : 0.0;
@@ -267,6 +266,7 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         Eigen::Vector3d target = Eigen::Vector3d::Zero();
         std::size_t n_used = 0;
         for (const auto ti : star[ni]) {
+            fill_progress_poll();
             for (const auto o : tets[ti]) {
                 target += nodes[o];
                 ++n_used;
@@ -282,6 +282,7 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         return target;
     };
     for (int iter = 0; iter < max_iters; ++iter) {
+        fill_progress_phase("quality_overlap_pull_pass", iter + 1, max_iters);
         const TetGrid grid(nodes, tets, h);
         const auto buried = buried_face_ids(nodes, free, grid);
         if (buried.empty()) {
@@ -289,6 +290,7 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         }
         bool any_moved = false;
         for (const auto& [fi, buryer] : buried) {
+            fill_progress_poll();
             for (const auto ni : free[fi].nodes) {
                 std::vector<std::uint32_t> group{ni};
                 if (orbit.active()) {
@@ -423,8 +425,8 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                                     c[static_cast<std::size_t>(t[1])],
                                                     c[static_cast<std::size_t>(t[2])],
                                                     c[static_cast<std::size_t>(t[3])]}};
-                    const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
-                                                            out.nodes[n[2]], out.nodes[n[3]]);
+                    const double v = validity::tet_signed_volume(
+                        out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]], out.nodes[n[3]]);
                     if (v < 0.0) {
                         std::swap(n[1], n[2]);
                     } else if (v == 0.0) {
@@ -478,11 +480,9 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
             const Eigen::Vector3d& b = out.nodes[n[1]];
             const Eigen::Vector3d& c = out.nodes[n[2]];
             const Eigen::Vector3d& d = out.nodes[n[3]];
-            // vol_eps alone is a machine-degeneracy test (~1e-14·h³, thirteen
-            // orders under a healthy tet), so the snap was free to flatten skin
-            // tets into slivers. Add the shape floor the unsnap line-search was
-            // supposed to defend.
-            return !(tet_signed_volume_impl(a, b, c, d) > vol_eps &&
+            // vol_eps alone is a machine-degeneracy test (~1e-14·h³), so the
+            // shape floor is what stops the snap flattening skin tets into slivers.
+            return !(validity::tet_signed_volume(a, b, c, d) > vol_eps &&
                      validity::tet_shape_quality(a, b, c, d) >= validity::kCellShapeFloor);
         };
         // Node -> incident tets, so the snap can line-search ONE node against
@@ -491,11 +491,8 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         // Without this callback `snap_boundary_nodes` takes its compatibility
         // path: a 0.75/0.5/0.25 ladder, and if none of the three fractions is
         // valid the node retreats ALL THE WAY to its raw Cartesian lattice
-        // site. On a bore that is a spike. Measured on plate_hole at h=3 mm:
-        // 30 near-bore boundary nodes off the exact CAD by up to 1.99 mm --
-        // 0.67 h, a fifth of the bore radius -- and the mesher printed
-        // `snap max|d|=0.002 m` while shipping it. With the callback the same
-        // node keeps the largest fraction of its projection that stays valid.
+        // site — a spike on a bore. With the callback the node keeps the
+        // largest fraction of its projection that stays valid.
         std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
         incident.reserve(out.nodes.size());
         for (std::size_t ti = 0; ti < out.tets.size(); ++ti) {
@@ -545,8 +542,7 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         //
         // First choice is the interior of its star: those nodes carry no
         // geometry constraint, so moving them is free. But a stair cell on a
-        // curved wall routinely has EVERY corner on the boundary (documented
-        // in hex_fill.cpp: 7 of 8 corners in boundary quads), and then the
+        // curved wall routinely has EVERY corner on the boundary, and then the
         // interior ring is empty and the node stays 0.5 h off the CAD. So the
         // fallback slides the star's OTHER boundary nodes tangentially and
         // re-projects them through the same exact oracle: they end up on the
@@ -637,13 +633,9 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
             }
         }
         // Mirror-canonical sweep order, and every accepted relaxation applied to
-        // the node's whole reflection orbit or to none of it. This is a
-        // Gauss-Seidel sweep with a validity gate, so in ascending node id it gave
-        // a node and its mirror image different predecessors: measured on
-        // sphere.step at h = 8 mm with `--mesher tet`, the shipped interior nodes
-        // had a MEDIAN mirror-partner distance of 1e-5 of the bbox diagonal, ten
-        // times the tolerance at which a pair counts as mirrored, and only 3% of
-        // tets had a mirror image.
+        // the node's whole reflection orbit or to none of it: this is a
+        // Gauss-Seidel sweep with a validity gate, so ascending node id would give
+        // a node and its mirror image different predecessors (ADR-0036).
         sort_mirror_canonical(out.nodes, interior);
         const MirrorNodeOrbit interior_orbit(
             mirror != nullptr ? *mirror : MirrorFrame{}, out.nodes, [&] {
@@ -717,11 +709,11 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
             }
         };
 
-        // Travel cap. 0.75 h is the historical tessellated default; with the
-        // exact oracle and interior relaxation in place a stair node on a
-        // slanted wall must be able to cross a half cell DIAGONAL (0.87 h) to
-        // reach the CAD at all, so the exact path uses the full 1.25 h the
-        // snap allows. Validity still gates every fraction of the move.
+        // Travel cap. 0.75 h is the tessellated default; with the exact oracle
+        // and interior relaxation in place a stair node on a slanted wall must
+        // be able to cross a half cell DIAGONAL (0.87 h) to reach the CAD at
+        // all, so the exact path uses the full 1.25 h the snap allows. Validity
+        // still gates every fraction of the move.
         const bool exact = fit != nullptr && fit->projection != nullptr;
         const auto run_snap = [&] {
             return snap_boundary_nodes(
@@ -759,8 +751,8 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         }
 
         for (auto& n : out.tets) {
-            const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
-                                                    out.nodes[n[2]], out.nodes[n[3]]);
+            const double v = validity::tet_signed_volume(out.nodes[n[0]], out.nodes[n[1]],
+                                                         out.nodes[n[2]], out.nodes[n[3]]);
             if (v < 0.0) {
                 std::swap(n[1], n[2]);
             }

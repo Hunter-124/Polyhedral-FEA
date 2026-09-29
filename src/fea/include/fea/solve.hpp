@@ -2,7 +2,7 @@
 #pragma once
 
 // Linear elastostatics solve: assemble, apply optional homogeneous multi-point
-// constraints, partition Dirichlet DOFs, then sparse direct LDLT or iterative CG.
+// constraints, partition Dirichlet DOFs, then the sparse direct ladder or iterative CG.
 
 #include "fea/assembly.hpp"
 #include "fea/constraints.hpp"
@@ -30,17 +30,37 @@ struct Dirichlet {
 
 /// Linear solver for the reduced free-DOF system K_ff u_f = rhs.
 enum class SolveMethod {
-    /// SimplicialLDLT when nfree ≤ cg_threshold; ConjugateGradient otherwise.
+    /// Direct ladder when nfree ≤ cg_threshold, ConjugateGradient above it.
     kAuto,
-    /// Always sparse Cholesky (SimplicialLDLT). Exact for SPD within roundoff.
+    /// Sparse direct: CholmodSupernodalLLT where SuiteSparse is compiled in,
+    /// else SimplicialLDLT(AMD), with SparseLU for a non-positive pivot.
+    /// Exact for SPD within roundoff.
     kDirect,
     /// ConjugateGradient with an incomplete-Cholesky preconditioner (SPD
     /// iterative), bounded by `cg_max_iters`.
     kCG,
 };
 
-/// Options for `solve_elastostatics`. Defaults keep LDLT for small/medium free
-/// systems so Tier-0 patch tests stay machine-exact on the direct path.
+/// Free-DOF count above which `kAuto` prefers CG, before the memory guard.
+///
+/// With SuiteSparse the direct rung is a supernodal (BLAS3) factorization,
+/// which beats preconditioned CG on these sparsities by orders of magnitude at
+/// every size that fits in memory — so the DOF number stops being the deciding
+/// factor and `decide_solve_method`'s memory budget is. The threshold survives
+/// only as a backstop: above it the factor estimate is far enough outside
+/// anything measured that the bounded-memory iterative path is the safer
+/// default. Without SuiteSparse the direct rung is a scalar simplicial
+/// factorization, which really does fall off a cliff, so the historical
+/// 50,000 stands.
+#if defined(POLYMESH_WITH_CHOLMOD)
+inline constexpr Eigen::Index kDefaultCgThreshold = 1'500'000;
+#else
+inline constexpr Eigen::Index kDefaultCgThreshold = 50'000;
+#endif
+
+/// Options for `solve_elastostatics`. Defaults keep the direct ladder for every
+/// system that fits in the memory budget, so Tier-0 patch tests stay
+/// machine-exact on the direct path.
 struct SolveOptions {
     SolveMethod method = SolveMethod::kAuto;
 
@@ -48,17 +68,14 @@ struct SolveOptions {
     /// 70% of the operating system's currently available memory.
     double max_mem_gb = 0.0;
 
-    /// Free-DOF count above which `kAuto` selects CG.
+    /// Free-DOF count above which `kAuto` selects CG; see `kDefaultCgThreshold`
+    /// for why the number depends on which direct rung this build has.
     ///
     /// The selection is deliberately cell-type independent: what makes a system
     /// hard for CG is its conditioning, and every mesher this project ships
-    /// produces systems bad enough that preconditioned CG loses to a sparse
-    /// Cholesky factorisation by two orders of magnitude at these sizes
-    /// (measured: 11040-DOF plate-with-hole hex, 179 s CG vs 0.9 s LDLT).
-    /// 3-D elastic sparsities of ~50k free DOF still factorise in seconds and
-    /// well under a gigabyte, so `kAuto` stays direct up to there and only
-    /// switches to CG where the factor genuinely stops fitting.
-    Eigen::Index cg_threshold = 50000;
+    /// produces systems on which preconditioned CG loses to sparse Cholesky by
+    /// orders of magnitude at these sizes (measurements: docs/solver-core.md §6.1).
+    Eigen::Index cg_threshold = kDefaultCgThreshold;
 
     /// CG true relative residual tolerance: return only when
     /// ‖b-K*x‖ / ‖b‖ ≤ cg_tol. If the recursive residual has fallen 100× since
@@ -120,6 +137,22 @@ struct SolveCostMeasured {
     double bytes = 0.0;
 };
 
+/// Wall-clock breakdown of one `solve_elastostatics` call, milliseconds.
+/// Measured inside the solve, so a caller reporting a phase table never has to
+/// infer where the time went from a single total. `analyze` is the symbolic
+/// factorization (direct) or the preconditioner build (CG); `factorize` is the
+/// numeric factorization or the CG iteration loop; `backsolve` is the
+/// triangular solves plus recovery of the full displacement vector.
+struct SolvePhaseTimings {
+    double preflight_ms = 0.0;
+    double assemble_ms = 0.0;
+    double reduce_ms = 0.0;
+    double analyze_ms = 0.0;
+    double factorize_ms = 0.0;
+    double backsolve_ms = 0.0;
+    double total_ms = 0.0;
+};
+
 struct LinearSolveResult {
     Eigen::VectorXd u;
     /// Support reactions in newtons, in the original 3N DOF layout. Entries at
@@ -134,6 +167,7 @@ struct LinearSolveResult {
     /// support resultant.
     bool reactions_complete = true;
     SolveCostMeasured cost;
+    SolvePhaseTimings phases;
 };
 
 /// Symmetric diagonal (Jacobi) equilibration of an SPD sparse matrix: returns
@@ -152,7 +186,7 @@ symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd);
                                               const SolveOptions& options = {});
 
 /// Apply the normal DOF threshold plus the effective memory cap. Explicit
-/// kDirect/kCG requests remain authoritative; only kAuto may downgrade LDLT to
+/// kDirect/kCG requests remain authoritative; only kAuto may downgrade direct to
 /// CG when the direct footprint does not fit and CG does.
 [[nodiscard]] SolveDecision decide_solve_method(Eigen::Index nfree,
                                                 const SolveOptions& options,
@@ -166,8 +200,9 @@ symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd);
 /// also be a slave. Throws FeaError if the reduced system is singular
 /// (insufficient constraints leave rigid-body modes) or CG fails.
 ///
-/// Default `options` use sparse LDLT for nfree ≤ `cg_threshold` (50000) and
-/// bounded CG above that; the choice never depends on element type.
+/// Default `options` use the sparse direct ladder for nfree ≤ `cg_threshold`
+/// (see `kDefaultCgThreshold`) and bounded CG above that, subject to the memory
+/// budget in `decide_solve_method`; the choice never depends on element type.
 /// Force `SolveMethod::kDirect` for exact patch-test path; force `kCG` to
 /// exercise the iterative solver on small systems.
 [[nodiscard]] LinearSolveResult

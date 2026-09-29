@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// CUDA device discovery and SpMV kernel (ADR-0008 / ROADMAP F3).
+// CUDA device discovery and SpMV kernel (ADR-0008).
 // CPU reference twin: fea/spmv.hpp spmv_cpu. Parity tests in test_spmv.cpp.
-// Batched element stiffness kernels land here as later F-track work needs them.
 
 #include <cuda_runtime.h>
 

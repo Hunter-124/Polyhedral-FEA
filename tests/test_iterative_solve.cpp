@@ -82,15 +82,21 @@ TEST_CASE("select_solve_method respects auto threshold and overrides") {
     CHECK(select_solve_method(1, opt) == SolveMethod::kCG);
 }
 
-TEST_CASE("default auto threshold keeps mid-size systems on the direct path") {
-    // Regression guard for the 8000-free-DOF cliff: kAuto used to hand 8k-50k
-    // systems to CG, which was 100-200x slower than LDLT on exactly these
-    // sparsities (11040-DOF plate-with-hole hex: 158 s CG vs 0.9 s LDLT).
+TEST_CASE("default auto threshold keeps large systems on the direct path") {
+    // Regression guard for two measured cliffs. The first was an 8000-free-DOF
+    // cliff where kAuto handed 8k-50k systems to CG, 100-200x slower than LDLT
+    // on these sparsities (11040-DOF plate-with-hole hex: 158 s CG vs 0.9 s
+    // LDLT). The second was the 50,000 cliff itself: with a supernodal direct
+    // rung, a 233,820-DOF curved tet10 plate factorizes in 19.6 s where CG ran
+    // for hours without reaching 1e-8, so the DOF count stops deciding and the
+    // memory budget in `decide_solve_method` does.
     const SolveOptions defaults;
     CHECK(defaults.method == SolveMethod::kAuto);
+    CHECK(defaults.cg_threshold == kDefaultCgThreshold);
     CHECK(select_solve_method(8001, defaults) == SolveMethod::kDirect);
-    CHECK(select_solve_method(50000, defaults) == SolveMethod::kDirect);
-    CHECK(select_solve_method(50001, defaults) == SolveMethod::kCG);
+    CHECK(select_solve_method(50001, defaults) == SolveMethod::kDirect);
+    CHECK(select_solve_method(kDefaultCgThreshold, defaults) == SolveMethod::kDirect);
+    CHECK(select_solve_method(kDefaultCgThreshold + 1, defaults) == SolveMethod::kCG);
 }
 
 TEST_CASE("CG honours its iteration cap instead of grinding") {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Discrete geometry indicators for a-priori sizing (ROADMAP C2).
+// Discrete geometry indicators for a-priori sizing.
 //
 // Curvature — dihedral / 1-ring mean-curvature proxy at vertices (1/m).
 // Thin-wall — inward ray-cast thickness proxy on closed manifold meshes (m).

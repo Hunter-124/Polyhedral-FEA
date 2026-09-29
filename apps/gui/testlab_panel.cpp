@@ -193,7 +193,6 @@ void TestLabState::refresh_selected() {
         checkpoint.reset();
         progress.reset();
         results.clear();
-        handoff.reset();
         return;
     }
     try {
@@ -215,7 +214,6 @@ void TestLabState::refresh_selected() {
         status = std::format("results.jsonl: {}", e.what());
     }
     progress = testlab::load_progress(sum->dir);
-    handoff = testlab::load_handoff(sum->dir);
 
     // Mirror process state into a friendly status line.
     if (runner.is_running()) {
@@ -333,7 +331,7 @@ bool TestLabState::start_run(bool resume) {
     }
 
     const auto binary = settings.resolved_testlab_binary();
-    // CLI contract (PROGRAM.yaml): polymesh_testlab run|resume <campaign_dir>
+    // CLI contract (docs/dag/interfaces.md): polymesh_testlab run|resume <campaign_dir>
     std::vector<std::string> args;
     args.push_back(resume ? "resume" : "run");
     args.push_back(dir.string());
@@ -385,7 +383,7 @@ bool TestLabState::force_stop() {
 }
 
 void draw_testlab_panel(TestLabState& tl) {
-    // V3c: workspace sync strip — git HEAD (startup-cached), selected campaign
+    // Workspace sync strip: git HEAD (startup-cached), selected campaign
     // checkpoint/progress state, and agent sync hint.
     iw::begin_group_box("workspace");
     ImGui::Text("git: %s", tl.git_head.empty() ? "unknown" : tl.git_head.c_str());
@@ -623,36 +621,11 @@ void draw_testlab_panel(TestLabState& tl) {
         }
         iw::end_group_box();
     }
-
-    // V10c: supervised open questions from handoff.json when present.
-    if (tl.handoff && !tl.handoff->open_program_nodes.empty()) {
-        iw::begin_group_box("open questions");
-        ImGui::TextColored(palette.text_dim, "handoff.json · open program nodes");
-        if (!tl.handoff->mode.empty()) {
-            ImGui::Text("mode: %s", tl.handoff->mode.c_str());
-        }
-        if (!tl.handoff->finished_utc.empty()) {
-            ImGui::TextColored(palette.text_dim, "finished %s",
-                               tl.handoff->finished_utc.c_str());
-        }
-        const auto& nodes = tl.handoff->open_program_nodes;
-        const float oh = std::min(
-            100.0f, 16.0f * static_cast<float>(std::min(nodes.size(), std::size_t{8})) + 4.0f);
-        if (ImGui::BeginChild("##open_nodes", ImVec2(-FLT_MIN, oh), ImGuiChildFlags_Borders)) {
-            for (const auto& id : nodes) {
-                ImGui::TextUnformatted(id.c_str());
-            }
-        }
-        ImGui::EndChild();
-        ImGui::TextColored(palette.accent, "V10c: queue for supervised review");
-        iw::end_group_box();
-    }
 }
 
 void draw_results_panel(TestLabState& tl) {
-    // Measure panel height *before* auto-sized group boxes. A table height
-    // taken inside AutoResizeY children is ~0, which capped the runs list at
-    // ~120 px; fill the remaining column so many rows are visible at once.
+    // Measure panel height *before* auto-sized group boxes: a table height taken
+    // inside AutoResizeY children is ~0, so the runs list fills the remaining column.
     const float panel_y0 = ImGui::GetCursorScreenPos().y;
     const float panel_h = ImGui::GetContentRegionAvail().y;
 

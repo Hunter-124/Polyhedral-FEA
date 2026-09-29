@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Convert face-based PolyMesh (G4 clipped Voronoi) → fea::NodalMesh of
-// kPolyVem elements for the product VEM path (M5).
+// Convert a face-based PolyMesh → fea::NodalMesh of kPolyVem elements for the
+// VEM solve path.
 
 #include "fea/nodal_mesh.hpp"
 #include "mesh/poly_mesh.hpp"

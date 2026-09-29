@@ -1,9 +1,13 @@
 # Solver and meshing research survey
 
 This note records the external methods reviewed for the portable-cost advisor
-retrain. It separates ideas used now from ideas that need a larger solver or
-corpus. The shipped finite-element numerics remain double precision; none of the
-training-precision experiments changes the solver.
+retrain ([0012](0012-portable-cost-retrain.md), the current generation). It
+separates ideas used now from ideas that need a larger solver or corpus. The
+shipped finite-element numerics remain double precision; none of the
+training-precision experiments changes the solver. Advisor inputs remain
+geometry plus geometric BC/load-region descriptors
+([0001](0001-architecture.md#feature-families)); solver telemetry and richer
+loading-condition signal are not inputs.
 
 ## Adopted now
 

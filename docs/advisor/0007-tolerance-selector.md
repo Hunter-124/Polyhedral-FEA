@@ -1,3 +1,5 @@
+> Superseded by [0012](0012-portable-cost-retrain.md); historical record.
+
 # 0007 — "Cheapest mesh within X" is not deliverable yet, and here is the number
 
 Status: measured 2026-08-14 on the 3080 Ti box (`hunter-pc`, gcc Release) at

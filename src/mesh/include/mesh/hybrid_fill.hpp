@@ -14,14 +14,46 @@
 #include "mesh/cvt_lloyd.hpp"
 #include "mesh/feature_pin.hpp"
 #include "mesh/mirror.hpp"
+#include "mesh/poly_mesh.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 
 #include <Eigen/Core>
 
+#include <cstddef>
+#include <functional>
 #include <span>
+#include <string>
 
 namespace polymesh::mesh {
+
+/// Synchronous graded-fill work observation. Counters describe completed/total
+/// work units in sub_phase: lattice cells, then nodes/tets/candidates. Zero
+/// before work exists is intentional; elements are always live tetrahedra.
+struct FillProgress {
+    std::size_t cells_done = 0;
+    std::size_t cells_total = 0;
+    std::size_t elements_so_far = 0;
+    std::string sub_phase;
+};
+
+struct FillOptions {
+    /// Empty disables observation without clock reads or progress allocations.
+    /// Called on phase changes and at most five seconds apart in working loops.
+    /// Individual synchronous CAD/kernel calls cannot be interrupted.
+    std::function<void(const FillProgress&)> on_progress;
+};
+
+/// Refinement stopped before another allocation-heavy wave. The measured
+/// count lets callers with an automatic size budget retry at a coarser h.
+class RefinementLimitError : public ValidityError {
+  public:
+    RefinementLimitError(std::size_t actual, std::size_t ceiling)
+        : ValidityError("graded_tet_fill_surface: memory-derived refinement ceiling exceeded"),
+          elements(actual), limit(ceiling) {}
+    const std::size_t elements;
+    const std::size_t limit;
+};
 
 struct GradedTetFillOutput {
     TetFillOutput mesh;    // nodes + tets + boundary quads
@@ -50,8 +82,8 @@ struct GradedTetFillOutput {
 
 /// Multi-level graded fill. `skin_layers` free-surface hops (skipped on thin
 /// parts). Feature/seed bands union with the optional scalar size field; field
-/// values are desired edge lengths in metres and are clamped at the lattice
-/// cell-budget floor before deriving L0/L1/L2.
+/// values are desired edge lengths in metres, independent of the background
+/// allocation floor. `max_refinement_tets` is the caller's memory-derived cap (0: uncapped).
 /// `curvature_turn_deg` > 0 enables the per-cell turning-angle criterion:
 /// cells where the surface turns more than that angle per bulk cell (h·κ)
 /// marks L1; more than twice it marks L2 — contiguous, inert on flats.
@@ -68,6 +100,7 @@ GradedTetFillOutput graded_tet_fill_surface(
     std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
     double curvature_turn_deg = 0.0, const BoundaryFit* fit = nullptr,
-    const SizeFieldFn& size_field = {}, const MirrorFrame* mirror = nullptr);
+    const SizeFieldFn& size_field = {}, const MirrorFrame* mirror = nullptr,
+    std::size_t max_refinement_tets = 0, const FillOptions& options = {});
 
 } // namespace polymesh::mesh

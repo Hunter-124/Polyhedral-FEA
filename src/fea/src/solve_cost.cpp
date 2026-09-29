@@ -6,6 +6,7 @@
 #include <Eigen/OrderingMethods>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -50,6 +51,34 @@ class DisjointSet {
     std::vector<int> parent_;
 };
 
+/// Whether a compressed pattern is already what `normalized_symmetric_pattern`
+/// would produce: structurally symmetric with every diagonal entry present.
+/// One pass with a binary search per entry, no allocation — worth checking
+/// because the solver's own reduced pattern always satisfies it, and
+/// symmetrizing through a Triplet list costs 16 bytes per entry twice over.
+bool already_normalized(const Eigen::SparseMatrix<double>& m) {
+    if (!m.isCompressed()) {
+        return false;
+    }
+    const int* const outer = m.outerIndexPtr();
+    const int* const inner = m.innerIndexPtr();
+    for (Eigen::Index col = 0; col < m.outerSize(); ++col) {
+        const int* const begin = inner + outer[col];
+        const int* const end = inner + outer[col + 1];
+        if (!std::binary_search(begin, end, static_cast<int>(col))) {
+            return false; // missing diagonal
+        }
+        for (const int* at = begin; at != end; ++at) {
+            const int row = *at;
+            if (!std::binary_search(inner + outer[row], inner + outer[row + 1],
+                                    static_cast<int>(col))) {
+                return false; // (row, col) present, (col, row) absent
+            }
+        }
+    }
+    return true;
+}
+
 Eigen::SparseMatrix<double>
 normalized_symmetric_pattern(const Eigen::SparseMatrix<double>& input) {
     if (input.rows() != input.cols()) {
@@ -57,6 +86,9 @@ normalized_symmetric_pattern(const Eigen::SparseMatrix<double>& input) {
     }
     if (input.rows() > static_cast<Eigen::Index>(std::numeric_limits<int>::max())) {
         throw FeaError("analyze_solve_cost: reduced pattern exceeds Eigen's int index range");
+    }
+    if (already_normalized(input)) {
+        return input;
     }
 
     std::vector<Eigen::Triplet<double>> entries;
@@ -289,49 +321,102 @@ Eigen::SparseMatrix<double> free_dof_pattern(const NodalMesh& mesh, const Dirich
         }
     };
 
-    // One reserve for the whole build. Reserving `entries.size() + k` per element
-    // asks for an exact capacity every iteration, which defeats the vector's
-    // geometric growth and reallocates-and-copies the whole buffer once per
-    // element: the 60k-tet10 l_bracket case in tests/test_brep_fidelity.cpp spent
-    // over 30 minutes copying triplets instead of the ~1 s the pattern build
-    // costs. Every element contributes at most (3 * nodes)^2 entries, since the
-    // local DOF list is deduplicated and prescribed DOFs are dropped, so this is
-    // an upper bound unless linear constraints expand a slave into several
-    // masters -- and then normal geometric growth takes over.
-    std::size_t estimated_entries = static_cast<std::size_t>(nfree);
-    for (const auto& element : mesh.elements) {
-        const std::size_t width = 3 * element.nodes.size();
-        estimated_entries += width * width;
-    }
-    std::vector<Eigen::Triplet<double>> entries;
-    entries.reserve(estimated_entries);
-    for (const auto& element : mesh.elements) {
+    // Per-element free-DOF images, then the union of their local x local
+    // blocks, built by counting straight into compressed storage. Linear in
+    // element count: no per-element exact-size reserve (which defeats geometric
+    // growth and goes quadratic) and no Triplet list.
+    std::vector<int> flat_locals;
+    std::vector<std::size_t> local_offsets;
+    local_offsets.reserve(mesh.elements.size() + 1);
+    local_offsets.push_back(0);
+    {
         std::vector<Eigen::Index> local;
-        local.reserve(3 * element.nodes.size());
-        for (const std::uint32_t node : element.nodes) {
-            if (node >= mesh.nodes.size()) {
-                throw FeaError("analyze_solve_cost: element node out of range");
+        for (const auto& element : mesh.elements) {
+            local.clear();
+            local.reserve(3 * element.nodes.size());
+            for (const std::uint32_t node : element.nodes) {
+                if (node >= mesh.nodes.size()) {
+                    throw FeaError("analyze_solve_cost: element node out of range");
+                }
+                for (int axis = 0; axis < 3; ++axis) {
+                    append_free_images(3 * static_cast<Eigen::Index>(node) + axis, local);
+                }
             }
-            for (int axis = 0; axis < 3; ++axis) {
-                append_free_images(3 * static_cast<Eigen::Index>(node) + axis, local);
+            std::sort(local.begin(), local.end());
+            local.erase(std::unique(local.begin(), local.end()), local.end());
+            for (const Eigen::Index dof : local) {
+                flat_locals.push_back(static_cast<int>(dof));
             }
+            local_offsets.push_back(flat_locals.size());
         }
-        std::sort(local.begin(), local.end());
-        local.erase(std::unique(local.begin(), local.end()), local.end());
-        for (const Eigen::Index row : local) {
-            for (const Eigen::Index col : local) {
-                entries.emplace_back(row, col, 1.0);
-            }
+    }
+
+    const auto n_elements = mesh.elements.size();
+    std::vector<std::uint64_t> column_offsets(static_cast<std::size_t>(nfree) + 1, 0);
+    for (std::size_t e = 0; e < n_elements; ++e) {
+        const auto begin = local_offsets[e];
+        const auto width = local_offsets[e + 1] - begin;
+        for (std::size_t i = 0; i < width; ++i) {
+            column_offsets[static_cast<std::size_t>(flat_locals[begin + i]) + 1] += width;
         }
     }
     for (Eigen::Index dof = 0; dof < nfree; ++dof) {
-        entries.emplace_back(dof, dof, 1.0);
+        ++column_offsets[static_cast<std::size_t>(dof) + 1]; // explicit diagonal
+    }
+    for (Eigen::Index dof = 0; dof < nfree; ++dof) {
+        column_offsets[static_cast<std::size_t>(dof) + 1] +=
+            column_offsets[static_cast<std::size_t>(dof)];
+    }
+    std::vector<int> rows(static_cast<std::size_t>(column_offsets.back()));
+    {
+        std::vector<std::uint64_t> cursor(column_offsets.begin(), column_offsets.end() - 1);
+        for (std::size_t e = 0; e < n_elements; ++e) {
+            const auto begin = local_offsets[e];
+            const auto width = local_offsets[e + 1] - begin;
+            for (std::size_t i = 0; i < width; ++i) {
+                auto& at = cursor[static_cast<std::size_t>(flat_locals[begin + i])];
+                for (std::size_t j = 0; j < width; ++j) {
+                    rows[static_cast<std::size_t>(at++)] = flat_locals[begin + j];
+                }
+            }
+        }
+        for (Eigen::Index dof = 0; dof < nfree; ++dof) {
+            rows[static_cast<std::size_t>(cursor[static_cast<std::size_t>(dof)]++)] =
+                static_cast<int>(dof);
+        }
     }
 
+    std::vector<std::uint64_t> unique_offsets(static_cast<std::size_t>(nfree) + 1, 0);
+    for (Eigen::Index dof = 0; dof < nfree; ++dof) {
+        const auto du = static_cast<std::size_t>(dof);
+        const auto begin = rows.begin() + static_cast<std::ptrdiff_t>(column_offsets[du]);
+        const auto end = rows.begin() + static_cast<std::ptrdiff_t>(column_offsets[du + 1]);
+        std::sort(begin, end);
+        unique_offsets[du + 1] =
+            unique_offsets[du] +
+            static_cast<std::uint64_t>(std::distance(begin, std::unique(begin, end)));
+    }
+    const auto nnz = unique_offsets.back();
+    if (nnz > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+        throw FeaError("analyze_solve_cost: reduced pattern exceeds Eigen's int index range");
+    }
     Eigen::SparseMatrix<double> pattern(nfree, nfree);
-    pattern.setFromTriplets(entries.begin(), entries.end(),
-                            [](double, double) { return 1.0; });
-    pattern.makeCompressed();
+    pattern.resizeNonZeros(static_cast<Eigen::Index>(nnz));
+    int* const outer = pattern.outerIndexPtr();
+    int* const inner = pattern.innerIndexPtr();
+    double* const values = pattern.valuePtr();
+    for (Eigen::Index dof = 0; dof < nfree; ++dof) {
+        const auto du = static_cast<std::size_t>(dof);
+        outer[du] = static_cast<int>(unique_offsets[du]);
+        const auto src = rows.begin() + static_cast<std::ptrdiff_t>(column_offsets[du]);
+        const auto count = unique_offsets[du + 1] - unique_offsets[du];
+        for (std::uint64_t k = 0; k < count; ++k) {
+            const auto at = unique_offsets[du] + k;
+            inner[at] = *(src + static_cast<std::ptrdiff_t>(k));
+            values[at] = 1.0;
+        }
+    }
+    outer[static_cast<std::size_t>(nfree)] = static_cast<int>(nnz);
     return pattern;
 }
 

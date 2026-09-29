@@ -1,3 +1,5 @@
+> Superseded by [0012](0012-portable-cost-retrain.md); historical record.
+
 # 0008 — The v4 corpus, the retrain, and the metric that punished being right
 
 Status: measured 2026-08-14 on `hunter-pc` and `livingroom-pc`, both gcc.

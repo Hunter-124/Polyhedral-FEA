@@ -24,10 +24,6 @@ ParsedLine tokenize(const std::string& line) {
     return out;
 }
 
-bool starts_with(std::string_view s, std::string_view prefix) {
-    return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
-}
-
 // Gmsh element type ids used by the P1 zoo (reference manual, MSH 2.2).
 enum class GmshType : int {
     kTri3 = 2,
@@ -76,10 +72,8 @@ ElementType to_element_type(GmshType t) {
     switch (t) {
     case GmshType::kTet4:
         return ElementType::kTet4;
-    // Quadratic MSH nodes are source-authored import geometry, not locally
-    // elevated CAD. Preserve their coordinates: this layer has no CadModel,
-    // and reprojecting them would discard the external mesher's exact mids
-    // (ADR-0028).
+    // Quadratic MSH mid-nodes are the external mesher's exact geometry: keep
+    // their coordinates (no CadModel here to reproject against; ADR-0028).
     case GmshType::kTet10:
         return ElementType::kTet10;
     case GmshType::kHex8:
@@ -199,7 +193,7 @@ MshModel parse_msh(const std::string& text) {
             require_section("$EndPhysicalNames");
             continue;
         }
-        if (starts_with(header, "$")) {
+        if (header.starts_with("$")) {
             // Skip unknown optional sections of the form $Foo ... $EndFoo.
             if (header == "$Elements") {
                 throw FeaError("msh: $Elements before $Nodes");

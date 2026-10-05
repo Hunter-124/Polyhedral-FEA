@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "geom/stl.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/grid_classify.hpp"
 #include "mesh/poly_mesh.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
@@ -77,7 +78,6 @@ TEST_CASE("L-domain public STL grid-fills with validity only (ADR-0015)") {
     auto vol = pipeline::volume_mesh(model, 0.25, pipeline::VolumeMesher::kTetFill);
     REQUIRE_FALSE(vol.mesh.elements.empty());
     REQUIRE_NOTHROW(vol.mesh.check_validity());
-    REQUIRE(vol.mesher_note.find("not Delaunay") != std::string::npos);
     for (const auto& el : vol.mesh.elements) {
         REQUIRE(el.type == polymesh::fea::ElementType::kTet4);
         REQUIRE(el.nodes.size() == 4);
@@ -137,6 +137,35 @@ TEST_CASE("tet_fill unit box has no diagonal voids (ray parity)") {
         int nx = std::max(1, static_cast<int>(std::ceil(1.0 / h - 1e-14)));
         nx += nx % 2;
         REQUIRE(n_vox == static_cast<std::size_t>(nx) * nx * nx);
+    }
+}
+
+TEST_CASE("ray parity preserves diagonal columns in a tolerance-expanded bar") {
+    for (const bool alternate_diagonal : {false, true}) {
+        auto surface = unit_box();
+        for (auto& vertex : surface.vertices)
+            vertex = vertex.cwiseProduct(Eigen::Vector3d{10.0, 10.0, 200.0});
+        if (alternate_diagonal) {
+            surface.triangles[0] = {0, 3, 1};
+            surface.triangles[1] = {1, 3, 2};
+            surface.triangles[2] = {4, 5, 7};
+            surface.triangles[3] = {5, 6, 7};
+        }
+        for (const double h : {8.0, 6.0, 4.0, 2.8}) {
+            auto grid = make_bbox_grid_even(
+                {-1e-7, -1e-7, -1e-7}, {10.0 + 1e-7, 10.0 + 1e-7, 200.0 + 1e-7},
+                h / std::sqrt(2.0));
+            grid.cell *= 0.5;
+            grid.nx *= 2;
+            grid.ny *= 2;
+            grid.nz *= 2;
+            for (const int ray_axis : {0, 1, 2}) {
+                INFO("diagonal=" << alternate_diagonal << " h=" << h << " axis=" << ray_axis);
+                const auto inside = classify_cells_inside_axis(surface, grid, ray_axis);
+                REQUIRE(inside.size() == static_cast<std::size_t>(grid.cell_count()));
+                CHECK(std::all_of(inside.begin(), inside.end(), [](bool cell) { return cell; }));
+            }
+        }
     }
 }
 

@@ -1,5 +1,22 @@
 # PROGRESS
 
+## 2026-10-05 — watertight shared-edge predicates with ARM FMA
+
+Ray-parity classification now evaluates an edge in a canonical endpoint order
+and negates it for the reverse direction. Neighboring triangles therefore see
+bitwise-opposite signs even when GCC contracts the determinant into FMA. The
+previous independently anchored expressions could both reject a ray on a face
+diagonal, losing interior columns and unnecessarily refining a plain STEP bar.
+Exact-zero hits still use the existing crossing de-duplication. No tolerances,
+mesh-size expectations, allocations or global floating-point flags changed.
+
+The retained regression covers both face diagonals, four lattice pitches and
+all three ray axes with a tolerance-expanded bounding box. On GCC 13/aarch64
+under QEMU 10.0.13 it failed before the fix and passed all 48 assertions after.
+The real STEP-bar consumer also passed all 47 original mesh-quality, requested
+size-band and element-ceiling assertions. Native Apple Silicon execution is
+not claimed.
+
 ## 2026-09-11 — CAD integration dependency release
 
 The `cad-fill-progress` branch publishes the CAD-required source update from the

@@ -103,12 +103,20 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
                 const Eigen::Vector3d& A = surface.vertices[tri[0]];
                 const Eigen::Vector3d& B = surface.vertices[tri[1]];
                 const Eigen::Vector3d& C = surface.vertices[tri[2]];
-                const double d1 =
-                    (B[a0] - A[a0]) * (c1 - A[a1]) - (B[a1] - A[a1]) * (c0 - A[a0]);
-                const double d2 =
-                    (C[a0] - B[a0]) * (c1 - B[a1]) - (C[a1] - B[a1]) * (c0 - B[a0]);
-                const double d3 =
-                    (A[a0] - C[a0]) * (c1 - C[a1]) - (A[a1] - C[a1]) * (c0 - C[a0]);
+                // Shared edges must evaluate bitwise-opposite predicates even
+                // when the compiler fuses a multiply and subtract (ARM FMA).
+                const auto edge = [&](const Eigen::Vector3d& P, const Eigen::Vector3d& Q) {
+                    const bool reverse =
+                        Q[a0] < P[a0] || (Q[a0] == P[a0] && Q[a1] < P[a1]);
+                    const Eigen::Vector3d& U = reverse ? Q : P;
+                    const Eigen::Vector3d& W = reverse ? P : Q;
+                    const double d = (W[a0] - U[a0]) * (c1 - U[a1]) -
+                                     (W[a1] - U[a1]) * (c0 - U[a0]);
+                    return reverse ? -d : d;
+                };
+                const double d1 = edge(A, B);
+                const double d2 = edge(B, C);
+                const double d3 = edge(C, A);
                 const bool has_neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
                 const bool has_pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
                 if (has_neg && has_pos) {

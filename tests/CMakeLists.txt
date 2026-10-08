@@ -97,7 +97,7 @@ add_executable(polymesh_tests
 # testlab helpers in apps/testlab (load_area.hpp, probe_util.hpp,
 # run_artifacts.hpp). Never app entry points or UI code; no display required.
 target_include_directories(polymesh_tests PRIVATE .
-    ${CMAKE_SOURCE_DIR}/apps/testlab
+    ${PROJECT_SOURCE_DIR}/apps/testlab
 )
 target_link_libraries(polymesh_tests
     PRIVATE polymesh::geom polymesh::mesh polymesh::adapt polymesh::fea
@@ -110,8 +110,8 @@ target_link_libraries(polymesh_tests
 if(TARGET gui_testlab_data)
     target_link_libraries(polymesh_tests PRIVATE gui_testlab_data)
 else()
-    target_sources(polymesh_tests PRIVATE ${CMAKE_SOURCE_DIR}/apps/gui/testlab_data.cpp)
-    target_include_directories(polymesh_tests PRIVATE ${CMAKE_SOURCE_DIR}/apps/gui)
+    target_sources(polymesh_tests PRIVATE ${PROJECT_SOURCE_DIR}/apps/gui/testlab_data.cpp)
+    target_include_directories(polymesh_tests PRIVATE ${PROJECT_SOURCE_DIR}/apps/gui)
     target_link_libraries(polymesh_tests PRIVATE nlohmann_json::nlohmann_json)
 endif()
 
@@ -136,7 +136,7 @@ endif()
 
 include(Catch)
 # Working directory = repo root so the bench harness can load bench/reference/.
-catch_discover_tests(polymesh_tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+catch_discover_tests(polymesh_tests WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 # Exercise the LU rung in its own process; Eigen assertions catch premature
 # status queries before numeric factorization.
@@ -144,4 +144,4 @@ add_test(NAME direct_sparselu_cantilever
     COMMAND polymesh_tests "forced CG matches direct LDLT on small cantilever")
 set_tests_properties(direct_sparselu_cantilever PROPERTIES
     ENVIRONMENT "POLYMESH_FEA_DIRECT=lu"
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

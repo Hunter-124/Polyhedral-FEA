@@ -22,7 +22,7 @@ add_custom_command(TARGET polymesh POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:polymesh>/../share/polymesh/calibration"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/tests/fixtures/parts/plate_hole.step"
+            "${PROJECT_SOURCE_DIR}/tests/fixtures/parts/plate_hole.step"
             "$<TARGET_FILE_DIR:polymesh>/../share/polymesh/calibration/plate_hole.step"
     COMMENT "Staging the portable-cost calibration mesh"
     VERBATIM)

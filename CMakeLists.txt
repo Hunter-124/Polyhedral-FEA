@@ -250,32 +250,35 @@ install(FILES assets/fonts/OFL.txt
     DESTINATION "${POLYMESH_INSTALL_DATADIR}/fonts"
 )
 
-set(CPACK_PACKAGE_NAME "polymesh")
-set(CPACK_PACKAGE_VENDOR "Hunter-124")
-set(CPACK_PACKAGE_CONTACT "https://github.com/Hunter-124/Polyhedral-FEA/issues")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "Adaptive polyhedral finite element analysis for CLI, desktop, and web")
-set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Hunter-124/Polyhedral-FEA")
-set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
-set(CPACK_PACKAGE_FILE_NAME
-    "polymesh-${PROJECT_VERSION}-linux-x86_64")
-set(CPACK_GENERATOR "TGZ")
-set(CPACK_SOURCE_GENERATOR "TGZ")
-set(CPACK_SOURCE_IGNORE_FILES
-    "/\\\\.git/"
-    "/build[^/]*/"
-    "/dist/"
-    "/examples/out/"
-    "/graphify-out/cache/"
-)
-if(UNIX AND NOT APPLE)
-    configure_file(
-        packaging/linux/bundle_for_cpack.cmake.in
-        "${CMAKE_CURRENT_BINARY_DIR}/bundle_for_cpack.cmake"
-        @ONLY
+# Packaging belongs to a standalone build; as a subproject (Chudware) the host owns CPack.
+if(PROJECT_IS_TOP_LEVEL)
+    set(CPACK_PACKAGE_NAME "polymesh")
+    set(CPACK_PACKAGE_VENDOR "Hunter-124")
+    set(CPACK_PACKAGE_CONTACT "https://github.com/Hunter-124/Polyhedral-FEA/issues")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+        "Adaptive polyhedral finite element analysis for CLI, desktop, and web")
+    set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Hunter-124/Polyhedral-FEA")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+    set(CPACK_PACKAGE_FILE_NAME
+        "polymesh-${PROJECT_VERSION}-linux-x86_64")
+    set(CPACK_GENERATOR "TGZ")
+    set(CPACK_SOURCE_GENERATOR "TGZ")
+    set(CPACK_SOURCE_IGNORE_FILES
+        "/\\\\.git/"
+        "/build[^/]*/"
+        "/dist/"
+        "/examples/out/"
+        "/graphify-out/cache/"
     )
-    set(CPACK_PRE_BUILD_SCRIPTS
-        "${CMAKE_CURRENT_BINARY_DIR}/bundle_for_cpack.cmake")
+    if(UNIX AND NOT APPLE)
+        configure_file(
+            packaging/linux/bundle_for_cpack.cmake.in
+            "${CMAKE_CURRENT_BINARY_DIR}/bundle_for_cpack.cmake"
+            @ONLY
+        )
+        set(CPACK_PRE_BUILD_SCRIPTS
+            "${CMAKE_CURRENT_BINARY_DIR}/bundle_for_cpack.cmake")
+    endif()
+    include(CPack)
 endif()
-include(CPack)

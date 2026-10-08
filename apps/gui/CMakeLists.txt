@@ -125,13 +125,13 @@ endif()
 
 install(TARGETS polymesh-gui RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES
-    "${CMAKE_SOURCE_DIR}/packaging/linux/io.github.hunter124.PolyMesh.desktop"
+    "${PROJECT_SOURCE_DIR}/packaging/linux/io.github.hunter124.PolyMesh.desktop"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
 install(FILES
-    "${CMAKE_SOURCE_DIR}/packaging/linux/io.github.hunter124.PolyMesh.metainfo.xml"
+    "${PROJECT_SOURCE_DIR}/packaging/linux/io.github.hunter124.PolyMesh.metainfo.xml"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo")
 install(FILES
-    "${CMAKE_SOURCE_DIR}/packaging/linux/io.github.hunter124.PolyMesh.svg"
+    "${PROJECT_SOURCE_DIR}/packaging/linux/io.github.hunter124.PolyMesh.svg"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps")
 install(FILES
     "${glfw_SOURCE_DIR}/LICENSE.md"

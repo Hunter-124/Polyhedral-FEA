@@ -8,6 +8,7 @@ Short summary of the most recent period. Current status and open work:
 
 | Date | Change | Evidence |
 |---|---|---|
+| 10-08 | **Single public line.** The private fork (`9554579..9737e10`) is merged into `master` with its history and retired; its content had already shipped squashed in `ef464dc` (one variant test, "adapt stops before the predicted next-pass growth", remains in that history only). `cad-fill-progress` merged. Subproject builds use `PROJECT_SOURCE_DIR` and skip CPack, so CAD's `add_subdirectory` no longer resolves this tree's LICENSE/fixtures against the host. | CAD core built and its CTest suite ran against this `master` as a local source before the pin moved. |
 | 10-05 | **Watertight shared-edge predicates under ARM FMA.** Ray-parity classification evaluates each edge in a canonical endpoint order and negates it for the reverse direction, so neighbouring triangles see bitwise-opposite signs even when GCC contracts the determinant into FMA; exact-zero hits keep the existing crossing de-duplication. No tolerances, mesh-size expectations, allocations or floating-point flags changed. | Regression over both face diagonals, four lattice pitches and all three ray axes failed before / passed (48 assertions) after on GCC 13/aarch64 under QEMU 10.0.13; the STEP-bar consumer passed all 47 mesh-quality, size-band and ceiling assertions. Native Apple Silicon not claimed. |
 
 ## 2026-09

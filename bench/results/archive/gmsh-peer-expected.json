@@ -10,7 +10,7 @@
   },
   "peer_file": "bench/results/archive/gmsh-peer.pre-enginefix.json",
   "peer_file_rows": 144,
-  "baseline_reference_revision": "895f46b~1",
+  "baseline_reference_revision": "0c17046~1",
   "generated": "2026-08-13T10:13:13.310332+00:00",
   "census": {
     "re-derived": 56,

@@ -83,8 +83,8 @@ geometry alone.
 
 - Campaign binary: `build/apps/testlab/polymesh_testlab` built 2026-08-18
   02:16:19Z, from the same commit range as the curved-geometry landing
-  (`b406e2e…6d36883`). Every row uses an explicit `-h`, so the later auto-sizing
-  change (`d2d9a15`) cannot have affected any label.
+  (`bce3250…4e506f1`). Every row uses an explicit `-h`, so the later auto-sizing
+  change (`b9ad3da`) cannot have affected any label.
 - 30 cross-directory `CAMPAIGN_PRIORITY` collisions were reported by the
   dataset rebuild and resolved by scan order, as in v6; 6 of them are identical
   results with nothing to break.

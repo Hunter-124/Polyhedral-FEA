@@ -22,7 +22,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "92455f9",
+    "version": "c6cd527",
     "case_id": "cantilever",
     "dofs": 48,
     "wall_time_s": {
@@ -62,7 +62,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "92455f9",
+    "version": "c6cd527",
     "case_id": "cantilever",
     "dofs": 216,
     "wall_time_s": {
@@ -102,7 +102,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "92455f9",
+    "version": "c6cd527",
     "case_id": "cantilever",
     "dofs": 1200,
     "wall_time_s": {
@@ -142,7 +142,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "92455f9",
+    "version": "c6cd527",
     "case_id": "cantilever",
     "dofs": 7776,
     "wall_time_s": {

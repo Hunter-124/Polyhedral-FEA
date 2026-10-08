@@ -19,5 +19,5 @@
   },
   "resources": { "max_threads": 0, "max_mem_gb": 0 },
   "warehouse": true,
-  "on_finish": { "analyze": true, "grok_handoff": true }
+  "on_finish": { "analyze": true }
 }

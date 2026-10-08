@@ -2,8 +2,8 @@
 
 # 0006 — The clean-data retrain, and what it cost the advisor's claims
 
-Status: measured 2026-08-14 at `b27b0e6`, on the campaign regenerated after the
-mesher untangle (`798ef79`). Companion to
+Status: measured 2026-08-14 at `f4b6c4a`, on the campaign regenerated after the
+mesher untangle (`4ba0cf4`). Companion to
 [0003-training-log.md](0003-training-log.md) and
 [0004-model-card.md](0004-model-card.md); everything here supersedes numbers in
 those files that were measured on the pre-untangle rows.

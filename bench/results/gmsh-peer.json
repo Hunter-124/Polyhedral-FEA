@@ -2,7 +2,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -35,7 +35,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -68,7 +68,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -101,7 +101,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -134,7 +134,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -194,7 +194,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -254,7 +254,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -323,7 +323,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -356,7 +356,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -389,7 +389,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -422,7 +422,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -455,7 +455,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -515,7 +515,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -575,7 +575,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -644,7 +644,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -677,7 +677,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -712,7 +712,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -747,7 +747,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -780,7 +780,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -815,7 +815,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -850,7 +850,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s0_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -885,7 +885,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -918,7 +918,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -951,7 +951,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -984,7 +984,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -1017,7 +1017,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -1077,7 +1077,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -1137,7 +1137,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -1206,7 +1206,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -1239,7 +1239,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -1272,7 +1272,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -1305,7 +1305,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -1338,7 +1338,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -1398,7 +1398,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -1458,7 +1458,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -1527,7 +1527,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -1560,7 +1560,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -1595,7 +1595,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -1630,7 +1630,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -1663,7 +1663,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -1698,7 +1698,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -1733,7 +1733,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s1_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -1768,7 +1768,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -1801,7 +1801,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -1834,7 +1834,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -1867,7 +1867,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -1900,7 +1900,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -1960,7 +1960,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -2020,7 +2020,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -2089,7 +2089,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -2122,7 +2122,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -2157,7 +2157,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -2192,7 +2192,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -2225,7 +2225,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -2260,7 +2260,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -2295,7 +2295,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -2330,7 +2330,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -2363,7 +2363,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -2398,7 +2398,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -2433,7 +2433,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -2466,7 +2466,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -2501,7 +2501,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -2536,7 +2536,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s2_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -2571,7 +2571,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -2604,7 +2604,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -2637,7 +2637,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.08,
@@ -2670,7 +2670,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -2703,7 +2703,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -2763,7 +2763,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -2823,7 +2823,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.08,
@@ -2892,7 +2892,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -2925,7 +2925,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -2960,7 +2960,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.12,
@@ -2995,7 +2995,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -3028,7 +3028,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -3063,7 +3063,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -3098,7 +3098,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.12,
@@ -3133,7 +3133,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -3166,7 +3166,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -3201,7 +3201,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 1,
     "h_rel": 0.2,
@@ -3236,7 +3236,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -3269,7 +3269,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -3304,7 +3304,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -3339,7 +3339,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "box_hole_s3_c0",
     "order": 2,
     "h_rel": 0.2,
@@ -3374,7 +3374,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -3408,7 +3408,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -3444,7 +3444,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -3480,7 +3480,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -3514,7 +3514,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -3550,7 +3550,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -3586,7 +3586,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -3622,7 +3622,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -3656,7 +3656,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -3692,7 +3692,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -3728,7 +3728,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -3762,7 +3762,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -3798,7 +3798,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -3834,7 +3834,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -3870,7 +3870,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -3904,7 +3904,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -3940,7 +3940,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -3976,7 +3976,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4010,7 +4010,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4046,7 +4046,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4082,7 +4082,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4118,7 +4118,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -4152,7 +4152,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -4186,7 +4186,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -4220,7 +4220,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -4254,7 +4254,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -4315,7 +4315,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -4376,7 +4376,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -4446,7 +4446,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -4480,7 +4480,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -4516,7 +4516,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -4552,7 +4552,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -4586,7 +4586,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -4622,7 +4622,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -4658,7 +4658,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -4694,7 +4694,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -4728,7 +4728,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -4764,7 +4764,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -4800,7 +4800,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4834,7 +4834,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4870,7 +4870,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4906,7 +4906,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -4942,7 +4942,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -4976,7 +4976,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -5010,7 +5010,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -5036,7 +5036,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -5070,7 +5070,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -5131,7 +5131,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -5157,7 +5157,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -5227,7 +5227,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -5261,7 +5261,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -5297,7 +5297,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -5333,7 +5333,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -5367,7 +5367,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -5403,7 +5403,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -5439,7 +5439,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -5475,7 +5475,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -5509,7 +5509,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -5545,7 +5545,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -5581,7 +5581,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -5615,7 +5615,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -5651,7 +5651,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -5687,7 +5687,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -5723,7 +5723,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -5757,7 +5757,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -5791,7 +5791,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -5825,7 +5825,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -5859,7 +5859,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -5920,7 +5920,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -5981,7 +5981,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -6051,7 +6051,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -6085,7 +6085,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -6119,7 +6119,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -6153,7 +6153,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -6187,7 +6187,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -6248,7 +6248,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -6309,7 +6309,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -6379,7 +6379,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -6413,7 +6413,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -6449,7 +6449,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -6485,7 +6485,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -6519,7 +6519,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -6555,7 +6555,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -6591,7 +6591,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "perforated_plate_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -6627,7 +6627,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -6660,7 +6660,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -6693,7 +6693,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -6726,7 +6726,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -6759,7 +6759,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -6819,7 +6819,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -6879,7 +6879,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -6948,7 +6948,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -6981,7 +6981,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -7011,7 +7011,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -7041,7 +7041,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7074,7 +7074,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7104,7 +7104,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7134,7 +7134,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7164,7 +7164,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -7197,7 +7197,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -7227,7 +7227,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -7257,7 +7257,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -7290,7 +7290,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -7320,7 +7320,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -7350,7 +7350,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -7380,7 +7380,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -7413,7 +7413,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -7446,7 +7446,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -7479,7 +7479,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -7512,7 +7512,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -7572,7 +7572,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -7632,7 +7632,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -7701,7 +7701,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -7734,7 +7734,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -7769,7 +7769,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -7804,7 +7804,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7837,7 +7837,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7872,7 +7872,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7907,7 +7907,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -7942,7 +7942,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -7975,7 +7975,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -8010,7 +8010,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -8040,7 +8040,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8073,7 +8073,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8108,7 +8108,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8138,7 +8138,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8173,7 +8173,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -8206,7 +8206,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -8239,7 +8239,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -8272,7 +8272,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -8305,7 +8305,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -8365,7 +8365,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -8425,7 +8425,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -8494,7 +8494,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -8527,7 +8527,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -8557,7 +8557,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -8587,7 +8587,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -8620,7 +8620,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -8650,7 +8650,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -8680,7 +8680,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -8710,7 +8710,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -8743,7 +8743,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -8773,7 +8773,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -8803,7 +8803,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8836,7 +8836,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8866,7 +8866,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8896,7 +8896,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -8926,7 +8926,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -8959,7 +8959,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -8992,7 +8992,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -9025,7 +9025,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9058,7 +9058,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9118,7 +9118,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9178,7 +9178,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9247,7 +9247,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -9280,7 +9280,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -9310,7 +9310,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -9340,7 +9340,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -9373,7 +9373,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -9403,7 +9403,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -9433,7 +9433,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -9463,7 +9463,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -9496,7 +9496,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -9526,7 +9526,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -9556,7 +9556,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -9589,7 +9589,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -9619,7 +9619,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -9649,7 +9649,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "stepped_shaft_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -9679,7 +9679,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -9713,7 +9713,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -9744,7 +9744,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -9775,7 +9775,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9809,7 +9809,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9840,7 +9840,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9871,7 +9871,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -9902,7 +9902,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -9936,7 +9936,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -9967,7 +9967,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -9998,7 +9998,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10032,7 +10032,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10063,7 +10063,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10094,7 +10094,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10125,7 +10125,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -10159,7 +10159,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -10196,7 +10196,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -10233,7 +10233,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -10267,7 +10267,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -10304,7 +10304,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -10341,7 +10341,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s0_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -10378,7 +10378,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -10412,7 +10412,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -10449,7 +10449,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -10486,7 +10486,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -10512,7 +10512,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -10549,7 +10549,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -10586,7 +10586,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -10623,7 +10623,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -10649,7 +10649,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -10686,7 +10686,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -10723,7 +10723,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10749,7 +10749,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10786,7 +10786,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10823,7 +10823,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -10860,7 +10860,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -10886,7 +10886,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -10923,7 +10923,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -10960,7 +10960,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -10986,7 +10986,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -11023,7 +11023,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -11060,7 +11060,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s1_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -11097,7 +11097,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -11131,7 +11131,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -11162,7 +11162,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -11193,7 +11193,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -11227,7 +11227,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -11258,7 +11258,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -11289,7 +11289,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -11320,7 +11320,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -11346,7 +11346,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -11377,7 +11377,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -11411,7 +11411,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -11437,7 +11437,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -11468,7 +11468,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -11529,7 +11529,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -11560,7 +11560,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -11586,7 +11586,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -11623,7 +11623,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -11660,7 +11660,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -11686,7 +11686,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -11723,7 +11723,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -11760,7 +11760,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s2_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -11797,7 +11797,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -11831,7 +11831,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -11862,7 +11862,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.08,
@@ -11896,7 +11896,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -11930,7 +11930,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -11961,7 +11961,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -12022,7 +12022,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.08,
@@ -12053,7 +12053,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -12087,7 +12087,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -12118,7 +12118,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.12,
@@ -12149,7 +12149,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -12183,7 +12183,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -12214,7 +12214,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -12245,7 +12245,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.12,
@@ -12276,7 +12276,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -12310,7 +12310,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -12347,7 +12347,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 1,
     "h_rel": 0.2,
@@ -12384,7 +12384,7 @@
   {
     "schema_version": 1,
     "solver": "gmsh-mesh+polymesh-solver",
-    "version": "gmsh-4.13.1+polymesh-f372e83",
+    "version": "gmsh-4.13.1+polymesh-67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -12418,7 +12418,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -12455,7 +12455,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-graded",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.2,
@@ -12492,7 +12492,7 @@
   {
     "schema_version": 1,
     "solver": "polymesh-native-uniform-p2",
-    "version": "f372e83",
+    "version": "67f0a8b",
     "case_id": "tube_s3_c1",
     "order": 2,
     "h_rel": 0.2,

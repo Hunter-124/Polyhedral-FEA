@@ -340,9 +340,9 @@ limits and build options are in [docs/reference.md](docs/reference.md).
 `dist/polymesh/bin/polymesh-gui [part.step]` opens the Study workspace: import
 CAD, set material and mesh preset, assign fixtures and loads on faces, then run
 **Mesh preview** or **Solve study**. Stress, deflection, ZZ error, deformation,
-and VTU export live in the dedicated Results inspector. Repository campaigns and
-self-improve tools remain available under **Workspace → Developer / Test Lab**
-instead of consuming the default product surface. CI also launches this installed
+and VTU export live in the dedicated Results inspector. Repository campaigns
+remain available under **Workspace → Developer / Test Lab** instead of
+consuming the default product surface. CI also launches this installed
 GUI under Xvfb.
 
 `dist/polymesh/bin/polymesh-webd` serves the browser companion on a local HTTP
@@ -377,8 +377,7 @@ Every non-obvious decision has an ADR under
 [docs/decisions/](docs/decisions/), written after the measurement rather than
 before it. [docs/solver-core.md](docs/solver-core.md) is the design narrative and
 [docs/progress.md](docs/progress.md) is the running log. Coding standards and the
-contribution flow are in [CONTRIBUTING.md](CONTRIBUTING.md) and
-[CHANGES.md](CHANGES.md).
+contribution flow are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

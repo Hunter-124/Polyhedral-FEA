@@ -9,7 +9,7 @@
 > im still seeing jagged transitions
 
 The image was a 1072x458 crop of `docs/assets/showcase/gallery_cylinder.png` at
-`83cfc83` — the clamped base of `cylinder.step`, solved at h = 12 mm. A flat
+`5c80aeb` — the clamped base of `cylinder.step`, solved at h = 12 mm. A flat
 purple region fills the bottom of the wall, and its upper edge is a sawtooth with
 an amplitude of about one element, wandering with no relation to the geometry.
 

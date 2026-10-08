@@ -3,8 +3,8 @@
 - Status: accepted (2026-08-13); all changes shipped and verified by running the product
 - Decision: D30
 - Related: ADR-0012 (hybrid/graded tet), ADR-0023 (measure-first), ADR-0028 (boundary conformance), ADR-0029 (independent truth, one-rule-one-implementation)
-- Evidence: commits `c3fbe62`, `9f6bba3`, `9cb1c8a`, `f224d57`, `2294b00`; `tests/test_quadrature.cpp`, `tests/test_mixed_fill.cpp`, `tests/test_geometry_fidelity.cpp`, `tests/test_cell_quality.cpp`, `tests/test_curved_mesh_quality.cpp`; suite 407/407
-- Supersedes: the mixed-level branch of the fill-stage guard introduced in `1d48978`
+- Evidence: commits `0713a76`, `ceaf996`, `8f5d325`, `64cbbb3`, `6422ba1`; `tests/test_quadrature.cpp`, `tests/test_mixed_fill.cpp`, `tests/test_geometry_fidelity.cpp`, `tests/test_cell_quality.cpp`, `tests/test_curved_mesh_quality.cpp`; suite 407/407
+- Supersedes: the mixed-level branch of the fill-stage guard introduced in `3cb27f4`
 
 ## Context
 
@@ -47,7 +47,7 @@ pyramids, and `fea::recover_zz` used it to weight stress recovery on them.
 
 ### The guard then argued for the wrong thing, convincingly
 
-`1d48978` had already noticed that the error barely moves as `h` shrinks, and
+`3cb27f4` had already noticed that the error barely moves as `h` shrinks, and
 had reasoned — carefully, from real measurements — that the transition rather
 than the resolution must be at fault. It shipped a refusal naming the fan as the
 cause and `--mesher graded_tet` as the remedy, and a regression test that ran

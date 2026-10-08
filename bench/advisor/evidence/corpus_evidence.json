@@ -1,6 +1,6 @@
 {
   "provenance": {
-    "git_revision": "5cd26e80c690f15c95b9e20fb8abc02a2f30fd7a-dirty",
+    "git_revision": "4c25103852571eeb5e9c98ac4f51a29a349a63de-dirty",
     "created_utc": "2026-08-22T19:01:35Z",
     "python": "3.14.6",
     "numpy": "2.4.6",
@@ -518,7 +518,7 @@
     "available": true,
     "source": "bench/advisor/learning_curve.json",
     "source_provenance": {
-      "git_revision": "4bda9706871c5280c2f889da9c67c59390735c9e-dirty",
+      "git_revision": "59ea1b6bd33e0c0895e1eff8099111d2af3e944a-dirty",
       "created_utc": "2026-08-13T05:47:55Z",
       "python": "3.11.9",
       "numpy": "2.4.4",

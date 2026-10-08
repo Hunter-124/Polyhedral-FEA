@@ -25,13 +25,13 @@ chronology); decisions are indexed in [`docs/decisions/`](decisions/README.md).
 Completed early tracks (GUI M1, grid meshers, hybrid honesty, adapt, Tier 0–2
 verification, OpenMP/CG/CUDA SpMV, release packaging — former tracks A–G) are
 recorded in [`archive/progress-history.md`](archive/progress-history.md); the
-retired track plan remains in git history at `ef464dc`.
+retired track plan remains in git history at `85f2b16`.
 
 ## Open defects
 
 | Defect | Detail | Next thread |
 |---|---|---|
-| Red tests inherited from `ef464dc` | Reproduced on `ef464dc` itself (before deslop and before the merge with `master`), with CHOLMOD absent as on CI: `boundary nodes land on the exact BRep for every CAD mesher`, `sharp BRep edges are reproduced by mesh feature segments`, `brep_fidelity: the shipped exterior conforms and every cell is integrable`, `curved scorecard: sphere hex passes, graded/hybrid lag or fail bar` (graded sphere composite 0.514 against the 0.75 floor, min tet quality 7e-6) and `default auto threshold keeps large systems on the direct path` (expects the CHOLMOD 1.5 M-DOF threshold). `master` at `bc0f36a` passes all of them. Cause: the graded fill was re-engineered on `ef464dc` (LEB before projection, `h_floor = hc / 4`, caller refinement cap), which is the same area as the graded sliver chain below. | Fix or re-gate against the ADR-0033 boundary bars; do not skip the tests. |
+| Red tests inherited from `85f2b16` | Reproduced on `85f2b16` itself (before deslop and before the merge with `master`), with CHOLMOD absent as on CI: `boundary nodes land on the exact BRep for every CAD mesher`, `sharp BRep edges are reproduced by mesh feature segments`, `brep_fidelity: the shipped exterior conforms and every cell is integrable`, `curved scorecard: sphere hex passes, graded/hybrid lag or fail bar` (graded sphere composite 0.514 against the 0.75 floor, min tet quality 7e-6) and `default auto threshold keeps large systems on the direct path` (expects the CHOLMOD 1.5 M-DOF threshold). `master` at `cf48d40` passes all of them. Cause: the graded fill was re-engineered on `85f2b16` (LEB before projection, `h_floor = hc / 4`, caller refinement cap), which is the same area as the graded sliver chain below. | Fix or re-gate against the ADR-0033 boundary bars; do not skip the tests. |
 | CHOLMOD on Ubuntu 24.04 SuiteSparse | With `POLYMESH_WITH_CHOLMOD` auto-detected against the distro SuiteSparse, `FE/VEM interface patch test: tet FE + hex VEM sharing a mid-plane` and `prism constant-strain patch on prism_fill lattice` segfault (`CHOLMOD error: invalid xtype or dtype` in `cholmod_analyze`). CI does not install SuiteSparse, so it does not see this. | Reproduce against the pinned SuiteSparse and fix the xtype/dtype setup, or disable auto-detect. |
 | Graded sliver chain | `cylinder` graded h=0.005 builds a mesh CG cannot solve (min edge 0.004 h). | Graded-snap re-engineering, not a threshold change (ADR-0033). |
 | `ellipsoid_boss` boundary tail | Binding constraint is `hex8_shape_quality >= 0.02` against the required wall travel. | The size field, not the snap (ADR-0033). |

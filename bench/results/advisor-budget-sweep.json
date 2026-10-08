@@ -1,6 +1,6 @@
 {
   "generated_utc": "2026-08-17T19:55:21Z",
-  "git_rev": "ee1cd64",
+  "git_rev": "ea48880",
   "cli": "build-fpoff/apps/cli/polymesh",
   "advisor_dir": "bench/advisor",
   "budgets": [

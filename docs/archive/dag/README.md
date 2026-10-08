@@ -10,11 +10,7 @@ program.
 read **[docs/plans/advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md)**
 and ADRs **0023–0024** before claiming packing or FEA metric work.
 
-Any agent or human, in any session, resumes work like this:
-
-> For autonomous / overnight agents, paste
-> `docs/dag/AGENT_BOOTSTRAP.md` (removed from HEAD; `git show ef464dc:docs/dag/AGENT_BOOTSTRAP.md`) into the harness — it wraps this
-> protocol with the sync-first, identity, and verification steps in one block.
+Anyone, in any session, resumes work like this:
 
 0. **Sync from remote first — always, before anything else.** You don't know
    the true state until you do: `git fetch origin`, `git status`, then
@@ -37,5 +33,4 @@ Any agent or human, in any session, resumes work like this:
    set it back to `todo` with a note pointing at the campaign data consumed.
 
 House rules that always apply: CONTRIBUTING.md (anti-cheat, Eigen traps,
-layout), commits authored as Hunter-124 with no AI attribution, push to
-master when verified, `graphify update .` after structural changes.
+layout), commits authored as Hunter-124, push to master when verified.

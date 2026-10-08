@@ -1,12 +1,4 @@
-# Keep GitHub language stats on C++ product code, not agent tooling / docs HTML.
-graphify-out/** linguist-vendored
-graphify-out/** linguist-generated
+# Keep GitHub language stats on C++ product code, not docs HTML.
 *.html linguist-vendored
 docs/** linguist-documentation
 bench/results/** linguist-generated
-
-# Union-merge concurrent graph updates (requires local:
-#   git config merge.graphify.driver "graphify merge-driver %O %A %B"
-# after `uv tool install graphifyy` / `pip install graphifyy`).
-graphify-out/graph.json merge=graphify
-graphify-out/manifest.json merge=union

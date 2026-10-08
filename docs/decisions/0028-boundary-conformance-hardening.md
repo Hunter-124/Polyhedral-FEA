@@ -3,13 +3,13 @@
 - Status: accepted (2026-08-11); complete — projection and evidence-path changes shipped, and the truth rerun plus retrains it gated on landed (ADR-0029, [advisor 0006–0008](../advisor/0008-v4-corpus-retrain.md))
 - Decision: D28
 - Related: ADR-0012 (hybrid/graded tet), ADR-0022 (experiment warehouse), ADR-0023 (measure-first), ADR-0027 (learned advisor)
-- Evidence: commits `18ee534`, `92455f9`, `f23b4d1`, `cb73261`, `08f9f55`; `tests/test_brep_fidelity.cpp`; `bench/results/gmsh-peer.json`
+- Evidence: commits `2aa4672`, `c6cd527`, `a8d47c2`, `b7a2b75`, `40a0863`; `tests/test_brep_fidelity.cpp`; `bench/results/gmsh-peer.json`
 
 ## Context
 
 Order elevation put every quadratic mid-edge node at the chord midpoint, so a
 curved order-2 rim missed the exact B-rep by the chord sagitta. The first
-owner-aware projection in `18ee534` fixed that geometry, but its validity gate
+owner-aware projection in `2aa4672` fixed that geometry, but its validity gate
 sampled corner volumes and reference edge-midpoint locations. A graded
 selective-p-elevation truth run then reached `element_stiffness: non-positive
 Jacobian`: stiffness integrated at points the gate had never sampled.
@@ -27,8 +27,8 @@ For `box_hole_s0_c0`, order 1, `h_rel=0.08`, the checked-in
 approximately 1.01; and our feature-graded tet at 0.190 with 7,608 DOF. Graded
 is most accurate; Gmsh is by far the best accuracy per DOF.
 
-**Evidence reconciliation.** `18ee534`'s first implementation reached residuals
-0.076 h and 0.0014 h, but its edge-midpoint guard was too weak. `f23b4d1`
+**Evidence reconciliation.** `2aa4672`'s first implementation reached residuals
+0.076 h and 0.0014 h, but its edge-midpoint guard was too weak. `a8d47c2`
 deliberately traded some geometric accuracy for stiffness validity: final
 residuals are 0.094 h and 0.034 h after quadrature-rule backoff. The code uses
 corner signed-volume epsilon \(10^{-14}h^3\), Jacobian epsilon

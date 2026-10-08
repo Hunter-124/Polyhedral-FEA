@@ -10,7 +10,7 @@ inside a training fold where nothing can see it.
 
 Generations so far:
 
-* ``v3`` — the untangle cycle ending at ``798ef79``. The S7 overlapped-sheet
+* ``v3`` — the untangle cycle ending at ``4ba0cf4``. The S7 overlapped-sheet
   carve alone moved sphere_box_s0 from rel_err 9.9e-04 to 1.1e-04.
 * ``v4`` — ADR-0032. The mesher no longer depends on the standard library's
   hash order, which changed the answer on some parts, and labelling moves from

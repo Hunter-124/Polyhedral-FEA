@@ -76,9 +76,9 @@ dist/polymesh/bin/polymesh-gui \
 The default Study workspace keeps Model, material/mesh presets, Run, and
 fixture/load assignment on the left; the viewport owns the center; field,
 deformation, metrics, and VTU export live in the Results inspector. Advanced
-mesher/adapt/resource controls are disclosed on demand. Repository campaigns,
-raw result tables, and self-improve controls live under **Workspace → Developer
-/ Test Lab** instead of occupying the release UI.
+mesher/adapt/resource controls are disclosed on demand. Repository campaigns and
+raw result tables live under **Workspace → Developer / Test Lab** instead of
+occupying the release UI.
 
 F12 or **File → Save screenshot** writes the window framebuffer to a PNG.
 `POLYMESH_GUI_SHOT=/abs/path.png` selects a fixed path and

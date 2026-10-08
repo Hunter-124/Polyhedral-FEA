@@ -11,7 +11,7 @@
 > it from the normal forces or something
 
 The image attached was `docs/assets/showcase/gallery_cantilever.png` at
-`f847607`. Two claims, and they turned out to be one defect: the second is what
+`87b8f00`. Two claims, and they turned out to be one defect: the second is what
 the first *looks like* to a reader.
 
 ## 2. The warp was applied. The camera cancelled it

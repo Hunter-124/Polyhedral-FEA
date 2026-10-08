@@ -2,13 +2,13 @@
 # FROZEN / HISTORICAL (2026-08-16): this board covers the program only
 # through node G4 (2026-07-13). All later work — ADR-0026 through ADR-0033
 # and the learned-advisor v2→v4 corpus program — is tracked in
-# docs/advisor/0003-training-log.md and the ADR set instead. Agents: read
+# docs/advisor/0003-training-log.md and the ADR set instead. Read
 # those first; the node list below is the final historical state of the
 # Lane M/G board, not the active program.
 # ════════════════════════════════════════════════════════════════════════
 #
 # Polyhedral-FEA adaptive-core program DAG.
-# THE pick-up-anywhere artifact: any agent/session resumes by reading this
+# THE pick-up-anywhere artifact: any contributor resumes by reading this
 # file, claiming a node whose deps are all `done`, setting it `in_progress`,
 # and committing the status flip with the work. Keep statuses honest —
 # `done` means built, tested, and documented, not "mostly there".
@@ -193,21 +193,21 @@ nodes:
       note). Test Lab: play/run, SIGINT pause, force stop, progress.json polish.
       Gates: test_gui_pipeline progress/cancel/pause, test_backend thread cap.
 
-  # ── Lane V: Varyhedron + BRep + short campaigns + Grok loop (2026-07-12) ─
+  # ── Lane V: Varyhedron + BRep + short campaigns (2026-07-12) ─────────────
   # Owner program: true BRep meshing, varyhedron packing from day 1, STEP-only
   # product fixtures (plate_hole/cylinder/sphere/icecream_cone), short campaigns
-  # (varyhedron + hybrid_zoo, ~3 runs/shape), full experiment warehouse, headless
-  # grok -p --yolo improvement loop. Plan: session plan.md / ADRs 0020–0022.
+  # (varyhedron + hybrid_zoo, ~3 runs/shape), full experiment warehouse.
+  # Plan: ADRs 0020–0022.
 
   - id: V0
-    title: "Program board + ADR-0020/21/22 + warehouse/handoff interfaces"
+    title: "Program board + ADR-0020/21/22 + warehouse interfaces"
     status: done
     deps: [dag-workflow]
     scope: [docs/dag/, docs/decisions/, docs/process/]
     note: >
       DONE 2026-07-12: ADRs 0020 (BRep volume), 0021 (varyhedron), 0022
-      (warehouse+grok), ADR-0001 amendment, interfaces §7–§8, grok-loop.md,
-      Lane V node list V0–V11, AGENT_BOOTSTRAP updated.
+      (warehouse), ADR-0001 amendment, interfaces §7, Lane V node list
+      V0–V11.
 
   - id: V1a
     title: CadModel type + STEP/BREP load keeping BRep
@@ -309,7 +309,7 @@ nodes:
     scope: [apps/testlab/]
     note: >
       DONE: runs/<cfg>/<part>/t<tier>/{mesh.vtu,quality.json,result.json};
-      on_finish analyze + write_grok_handoff hooks.
+      on_finish analyze hook.
 
   - id: V3c
     title: GUI/app git HEAD + campaign sync state
@@ -320,7 +320,7 @@ nodes:
       DONE 2026-07-12: Test Lab "workspace" strip shows short git HEAD
       (git rev-parse --short HEAD once at startup; "unknown" on failure),
       selected campaign checkpoint state + completed_runs (testlab_data
-      parsers), and "Sync: pull --rebase before agent runs". Status bar
+      parsers), and "Sync: pull --rebase before runs". Status bar
       prefixes "polymesh @ <HEAD>".
 
   - id: V4
@@ -437,46 +437,20 @@ nodes:
       wire.png via vtu_wire_png.py; testlab on_finish when warehouse=true;
       bench/campaigns/README.md documents flags.
 
-  - id: V10a
-    title: write_grok_handoff.py HANDOFF pack
+  - id: V10c
+    title: Test Lab measure-first results view
     status: done
     deps: [V9a]
-    scope: [scripts/, docs/process/]
-    note: DONE scripts/write_grok_handoff.py (trends + shots + open nodes).
-
-  - id: V10b
-    title: invoke_grok_improve.sh headless grok -p --yolo
-    status: done
-    deps: [V10a]
-    scope: [scripts/, apps/gui/]
-    note: DONE scripts/invoke_grok_improve.sh (--yolo, deny force-push).
-
-  - id: V10c
-    title: Supervised GUI question queue vs autonomous defaults
-    status: done
-    deps: [V10b]
     scope: [apps/gui/, docs/process/]
     note: >
       DONE 2026-07-13: Test Lab measure-first ready — results parse health/
-      scorecard/answers; ok/suspect/fail chips; solve_suspect amber; HANDOFF
-      open_program_nodes panel (supervised); baseline-m9 badge; Varyhedron
-      tooltip ADR-0023/24. Full interactive Q&A answer queue deferred (autonomous
-      grok-loop remains default).
-
-  - id: V10d
-    title: Safety allow/deny for grok invoke
-    status: done
-    deps: [V10b]
-    scope: [scripts/]
-    note: >
-      DONE 2026-07-12: invoke_grok_improve.sh --deny force-push patterns
-      (git push --force* / -f*); write_grok_handoff + AGENT_BOOTSTRAP require
-      pull --rebase and never force-push.
+      scorecard/answers; ok/suspect/fail chips; solve_suspect amber;
+      baseline-m9 badge; Varyhedron tooltip ADR-0023/24.
 
   - id: V11
     title: Feedback iterate packing (repeatable)
     status: todo
-    deps: [V10a, M1, M2]
+    deps: [V9a, M1, M2]
     scope: [src/mesh/, src/pipeline/, bench/campaigns/, docs/]
     note: >
       ADR-0024 Q8 + plan docs/plans/advisor-measure-first-program.md §4.4/§9.
@@ -596,7 +570,7 @@ nodes:
       DONE 2026-07-13 (ADR-0024 Q2(c)): freeze campaign varyhedron-baseline-m9 —
       8 runs (4 STEP × varyhedron+hybrid_zoo × h_scale=5.0 only; fast freeze vs
       24-run short-1 overnight). ok_rate=75% (6/8); both cylinder solve_suspect
-      (load_area gate). polymesh SHA dcb2baa; schema scorecard-m1-m8-v1.
+      (load_area gate). polymesh SHA 78a6dfe; schema scorecard-m1-m8-v1.
       Artifacts: results.jsonl, PARETO, HANDOFF, BASELINE.md. Packing loops
       measure delta vs this freeze only. Next: M10 wall project.
 

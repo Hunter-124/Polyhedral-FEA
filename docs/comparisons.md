@@ -9,7 +9,7 @@ solver.
 ## Gmsh: swapping the mesh source
 
 The matrix below is the committed one
-([`a25b4ec`](../bench/results/gmsh-peer.json), 336 rows, engine `f372e83`).
+([`c355707`](../bench/results/gmsh-peer.json), 336 rows, engine `67f0a8b`).
 Order-1 medians are the clean comparison, and our meshers win all four families
 on accuracy:
 
@@ -67,7 +67,7 @@ tet10 elements that PolyMesh rejects.
 ### A defect the comparison exposed
 
 The comparison also exposed a real stress-recovery defect on our side: ZZ patch
-fits were extrapolated at p-elevated mid-side nodes. Fixing it (`08f9f55`) moved
+fits were extrapolated at p-elevated mid-side nodes. Fixing it (`40a0863`) moved
 `box_hole_s2_c0`, `h_rel=0.08`, order 2 from 2.595 relative error to 0.0072,
 within 0.72% of Kirsch 3.0, while the spurious node fell from 10.79 MPa to about
 1.2 MPa.

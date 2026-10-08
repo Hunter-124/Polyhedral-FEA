@@ -76,7 +76,7 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--peer", type=Path, default=PEER_PATH)
     parser.add_argument("--out", type=Path, default=OUT_PATH)
-    parser.add_argument("--baseline-ref", default="895f46b~1",
+    parser.add_argument("--baseline-ref", default="0c17046~1",
                         help="git revision holding the references the peer file was scored "
                              "against (default: the commit before truth was replaced)")
     args = parser.parse_args()

@@ -75,7 +75,7 @@ ADR bodies are frozen once accepted. A later ADR amends or supersedes an earlier
 |---|---|---|---|
 | [0002](0002-license-bsd3.md) | License | BSD-3-Clause | accepted; supersedes AGPL-3.0-or-later |
 | [0007](0007-language-cpp.md) | Implementation language | C++20, CMake + Ninja | accepted |
-| [0022](0022-experiment-warehouse-grok-loop.md) | Experiment warehouse + Grok loop | Full experiment warehouse in git; headless Grok improvement loop | accepted; loop part retired (see Notes) |
+| [0022](0022-experiment-warehouse.md) | Experiment warehouse | Full experiment warehouse in git | accepted |
 | [0023](0023-measure-first-tet-primary-cvt-path.md) | Measure-first, tet primary, CVT | Measure before claiming; tet primary; restricted CVT ranked packing path | accepted; supersedes 0021 ranking in part |
 | [0028](0028-boundary-conformance-hardening.md) | Boundary-conformance hardening | Harden projection, probes and evidence paths across mesh/solve | accepted; complete |
 | [0029](0029-independent-truth-and-honest-gates.md) | Independent truth, honest gates | Independent references, mesh-independent load, gates that cannot fake success | accepted; complete |
@@ -83,6 +83,5 @@ ADR bodies are frozen once accepted. A later ADR amends or supersedes an earlier
 
 ## Notes
 
-- ADR-0022 recorded two things. The **experiment warehouse** remains in force. The **headless Grok improvement loop** is retired: its tooling has been removed from the repo. The ADR body is left unchanged as history.
 - ADR-0021 (Varyhedron, variable polyhedral packing) is a core, active product direction, not an experiment. ADR-0023 reordered its algorithm ranking; it did not retire it.
 - Frozen ADRs keep their original links. Targets that moved to [docs/archive/](../archive/README.md): `docs/research/**` is now `docs/archive/research/**`; `docs/plans/variable-everything-and-advisor.md` and `docs/plans/mesher-solver-overhaul.md` are now under `docs/archive/plans/`. This affects ADR-0018, 0025, 0026 and 0027.

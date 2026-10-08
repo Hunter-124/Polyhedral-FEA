@@ -3,7 +3,7 @@
 # 0007 — "Cheapest mesh within X" is not deliverable yet, and here is the number
 
 Status: measured 2026-08-14 on the 3080 Ti box (`hunter-pc`, gcc Release) at
-`d09171d`, dataset `bench/advisor/dataset.csv`, 2,896 rows, sha256
+`ed6fde4`, dataset `bench/advisor/dataset.csv`, 2,896 rows, sha256
 `8a402e910141f5…`. Training track **2b** of
 [../training/HANDOFF-3080ti.md](../training/HANDOFF-3080ti.md) §2b. Companion to
 [0006-clean-data-retrain.md](0006-clean-data-retrain.md).
@@ -118,12 +118,11 @@ consistent with 0003 §"the target, not the estimator, is the limit".
 ## 5. Provenance
 
 - `bench/advisor/tolerance_selector.json` — 12 folds, seed 1234, 40 epochs,
-  `git_revision d09171d`, dataset sha256 `8a402e910141f5…`, 2,896 rows.
+  `git_revision ed6fde4`, dataset sha256 `8a402e910141f5…`, 2,896 rows.
 - `bench/advisor/crossval_v4_tolerance.json` — the same selectors inside the
   standard 12-fold × 5-seed crossval, where the margin is fitted per fold on
   *training* cases; its calibrated rows are the in-sample variant and are
   superseded by §3 above.
 - Labelled corpus is unchanged: this track added no campaign rows, and the rows
-  it reads were labelled on the laptop's MSVC build. See
-  [../training/ACCESS-hunter-pc.md](../training/ACCESS-hunter-pc.md) §4.1 for why
-  that provenance now matters on this box.
+  it reads were labelled on the laptop's MSVC build. ADR-0032 explains why that
+  provenance matters: gcc and MSVC builds disagree on part of the corpus.

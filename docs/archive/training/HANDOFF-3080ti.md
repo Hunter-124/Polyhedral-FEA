@@ -5,13 +5,13 @@
 > Host names below are campaign `--host-tag` labels; machine access details were
 > removed from the repository. Paths under `bench/campaigns/archive-v*/` and
 > `bench/advisor/archive-v*/` were removed from HEAD; recover them with
-> `git show ef464dc:<path>`.
+> `git show 85f2b16:<path>`.
 
-Written 2026-08-13, at HEAD `91e08b4`. Read this before the first training run
+Written 2026-08-13, at HEAD `ad683a3`. Read this before the first training run
 starts. The mesher is now stable enough to label against: the tangle fix
-(S7 overlapped-sheet carve, `6822ea7` + `798ef79`) was the last known
+(S7 overlapped-sheet carve, `559e61d` + `4ba0cf4`) was the last known
 geometry-changing defect, and every fix this cycle changed graded_tet output,
-so **nothing labelled before `798ef79` is trustworthy for graded_tet rows**.
+so **nothing labelled before `4ba0cf4` is trustworthy for graded_tet rows**.
 
 ## 0. What the box needs (bring-up checklist)
 
@@ -107,7 +107,7 @@ generation split exists to prevent.
   moved 61.8 (v3) → 44.76 (v4); "still vetoes" is the contract, not the number.
 - Acceptance: advisor smoke tests unchanged (plate_hole → graded_tet,
   exit 0), held-out accuracy ≥ old model on the clean labels.
-- **DONE 2026-08-14** (`b27b0e6`, `dada547`) on the v3 corpus. Measured in
+- **DONE 2026-08-14** (`f4b6c4a`, `ed6fde4`) on the v3 corpus. Measured in
   `docs/advisor/0006-clean-data-retrain.md`, including where it lost: the net
   trailed LightGBM on DOF by 2.4×, and macro-mean regret ranked the learned
   choosers below `random` at the median budget.

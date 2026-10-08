@@ -2,7 +2,7 @@
 
 Layout for experiment campaigns under `bench/campaigns/<name>/`.
 Normative schema: [docs/dag/interfaces.md §7](../../docs/dag/interfaces.md) ·
-[ADR-0022](../../docs/decisions/0022-experiment-warehouse-grok-loop.md).
+[ADR-0022](../../docs/decisions/0022-experiment-warehouse.md).
 
 ## Directory layout
 

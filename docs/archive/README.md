@@ -1,6 +1,6 @@
 # Archive
 
-Frozen history as of commit `ef464dc`. Files here are kept for provenance and
+Frozen history as of commit `85f2b16`. Files here are kept for provenance and
 are not maintained; edits are limited to archive banners and relative-link
 fixes. They do not describe current status or policy: current status and next work are in
 [docs/STATUS.md](../STATUS.md); binding decisions are the ADRs in

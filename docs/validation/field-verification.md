@@ -15,7 +15,7 @@ python3 scripts/verify_fields.py --h-study   # + cantilever h-refinement
 It reads the solve VTUs that `scripts/render_showcase.py` caches in
 `build/showcase/`, so it verifies **exactly the fields the shipped figures
 draw** — not a separate toy problem. Nonzero exit if any check leaves its band.
-Measured 2026-08-20 at `33d60bf`: **33/33 inside band.**
+Measured 2026-08-20 at `9741c37`: **33/33 inside band.**
 
 ---
 

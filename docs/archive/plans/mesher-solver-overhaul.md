@@ -1,15 +1,14 @@
 # Plan: Mesher / Solver Accuracy + Performance Overhaul
 
-**Status:** Ready for approval · **Mode:** monolithic DAG + parallel subagents  
+**Status:** Ready for approval · **Mode:** monolithic DAG + parallel lanes  
 **Handoff artifact (in-repo, write on execute):** `docs/plans/mesher-solver-overhaul.md`  
 **Owner priority:** (1) hybrid zoo + graded tet fixes, (2) shared perf, (3) octahedral experiment, (4) solver polish
 
-This plan is the source of truth for this epic. Any agent/harness that picks it up should:
+This plan is the source of truth for this epic. Whoever picks it up should:
 
 1. Read this file + `docs/ROADMAP.md` + `docs/progress.md` + ADRs 0012/0013/0015/0016  
-2. Run `graphify query "graded hybrid mixed_fill assembly snap"` if `graphify-out/` exists  
-3. Execute unblocked DAG nodes in parallel worktrees / subagents  
-4. After each landed node: green `ctest`, commit+push `master` (Hunter prefs), update progress  
+2. Execute unblocked DAG nodes in parallel worktrees  
+3. After each landed node: green `ctest`, commit+push `master` (Hunter prefs), update progress  
 
 ---
 
@@ -56,7 +55,7 @@ Product claim (SPEC / ADR-0012): hybrid zoo and graded tet should beat uniform l
 
 - GATE-1 pure hex8 / pure tet formulations on *imported* structured meshes stay frozen.  
 - ADR-0015 honesty: product fill remains Cartesian until a true Delaunay/CAD mesher ships — do not market “boundary-fitted” after cosmetic snap.  
-- Double only; no AI attribution in commits; green full suite before push.  
+- Double only; green full suite before push.  
 - Prefer geometric conformity via transition elements (SPEC); hanging nodes only if constrained or VEM-owned.
 
 ---
@@ -182,7 +181,7 @@ New `VolumeMesher::kOctahedral` + `octa_fill_surface`:
 
 ## Monolithic DAG (parallel execution)
 
-Nodes are landable PRs/commits. Edges = must-finish-before. Same rank = **safe to parallelize** in worktrees/subagents if they don’t thrash the same files (or serialize file ownership as noted).
+Nodes are landable PRs/commits. Edges = must-finish-before. Same rank = **safe to parallelize** in worktrees if they don’t thrash the same files (or serialize file ownership as noted).
 
 ```text
                          ┌──────────────────────┐
@@ -259,7 +258,7 @@ When two lanes need `scene.cpp` / `VolumeMesher` enum: land enum additions first
 
 ---
 
-## Implementation notes (for coding agents)
+## Implementation notes
 
 ### G1 template detail (minimum viable)
 
@@ -282,7 +281,7 @@ Pyramid tet-split uses base diagonal 0–2. Kuhn skin uses `kCubeTets` diagonals
 // Only if hex shares a face with tet without pyramid buffer → assert/fail mesher.
 ```
 
-### Profiling commands (agent verify)
+### Profiling commands
 
 ```bash
 cmake --build build -j$(nproc)
@@ -315,7 +314,6 @@ ctest --test-dir build -j$(nproc) --output-on-failure
 - [ ] Visual: hole silhouette hybrid/graded competitive with hex (quad-ish skin or successful snap)  
 - [ ] Octa experimental path smokes  
 - [ ] Docs: plan committed, ADRs amended, progress + ROADMAP updated  
-- [ ] `graphify update .` if structural; commit graph artifacts  
 
 ### Anti-cheat
 
@@ -326,12 +324,10 @@ ctest --test-dir build -j$(nproc) --output-on-failure
 
 ---
 
-## Parallel subagent playbook (handoff)
-
-When driving this epic autonomously:
+## Parallel lane playbook
 
 ```
-1. Land M0 + G0 + H0 + S0 in parallel (4 agents / worktrees if available).
+1. Land M0 + G0 + H0 + S0 in parallel (separate worktrees).
 2. Barrier: merge to master.
 3. Land G1 and H1 in parallel (different files).
 4. Barrier.
@@ -339,7 +335,7 @@ When driving this epic autonomously:
 6. V1 then E1.
 ```
 
-Each subagent prompt must include:
+Each lane works from:
 
 - This plan path  
 - Exact node ID + acceptance  

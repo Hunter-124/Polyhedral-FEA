@@ -17,7 +17,7 @@ claim a “win” against pre-M6–M8 short campaigns alone.
 | --- | --- |
 | **Frozen UTC** | 2026-07-13T00:38:59Z (checkpoint `updated_utc`; analyze 00:39:00Z) |
 | **Frozen date** | 2026-07-13 |
-| **polymesh git SHA** | `dcb2baa380be1bafc2b4d9ff5d585c5d31ab964c` (`dcb2baa`) |
+| **polymesh git SHA** | `78a6dfe1cd1cd02ba1da88169ebc768c7945506b` (`78a6dfe`) |
 | **Binary** | `build/apps/testlab/polymesh_testlab` (OCC product build) |
 | **Campaign** | `bench/campaigns/varyhedron-baseline-m9/` |
 | **Results** | [`results.jsonl`](results.jsonl) (8 lines) |
@@ -82,7 +82,7 @@ parts: plate_hole, cylinder, sphere, icecream_cone  (STEP fixtures)
 meshers: varyhedron, hybrid_zoo
 tiers: [{ "h_scale": 5.0, "keep_frac": 1.0 }]
 warehouse: true
-on_finish: { analyze: true, grok_handoff: true }
+on_finish: { analyze: true }
 ```
 
 cfg_ids: `cfg-028399df` = hybrid_zoo · `cfg-89f62376` = varyhedron

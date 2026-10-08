@@ -11,18 +11,18 @@
   },
   "provenance": {
     "git": {
-      "base_commit": "894ede751a5fe77e4a944eab65e48e08d4254965",
+      "base_commit": "5cf8d8b5a2133d0291e45755838ed9022a06f21a",
       "baseline_checkout": "origin/master at base_commit",
       "candidate_working_tree_dirty": true,
       "candidate_tracked_diff": {
-        "base_commit": "894ede751a5fe77e4a944eab65e48e08d4254965",
+        "base_commit": "5cf8d8b5a2133d0291e45755838ed9022a06f21a",
         "sha256": "1e7c26c0fe61008dfdee0b32b826d22cdf38a35ae05096415ad50228fdd38478",
         "bytes": 253764,
         "command": [
           "git",
           "diff",
           "--binary",
-          "894ede751a5fe77e4a944eab65e48e08d4254965",
+          "5cf8d8b5a2133d0291e45755838ed9022a06f21a",
           "--",
           "README.md",
           "apps/cli/main.cpp",
@@ -71,7 +71,7 @@
         ],
         "excludes": [
           "bench/results/cvt-rvd-topology-current.json",
-          "generated graphify metadata",
+          "generated metadata",
           "unrelated dirty benchmark artifacts"
         ]
       }
@@ -172,7 +172,7 @@
       "git",
       "diff",
       "--binary",
-      "894ede751a5fe77e4a944eab65e48e08d4254965",
+      "5cf8d8b5a2133d0291e45755838ed9022a06f21a",
       "--",
       "<provenance.git.candidate_tracked_diff.paths...>"
     ]

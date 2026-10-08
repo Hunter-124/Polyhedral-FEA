@@ -776,7 +776,7 @@ _GIT_REVISION: str | None = None
 
 
 def git_revision() -> str:
-    """``129de02`` or ``129de02+dirty``; ``unknown`` if this is not a checkout.
+    """``fc6055f`` or ``fc6055f+dirty``; ``unknown`` if this is not a checkout.
 
     ``+dirty`` is not decoration. Most figures in this repository are
     regenerated from a working tree mid-sweep, and a stamp that silently

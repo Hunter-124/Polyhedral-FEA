@@ -269,7 +269,6 @@ if(PROJECT_IS_TOP_LEVEL)
         "/build[^/]*/"
         "/dist/"
         "/examples/out/"
-        "/graphify-out/cache/"
     )
     if(UNIX AND NOT APPLE)
         configure_file(

@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
   "generated_utc": "2026-08-25T21:02:57Z",
-  "git_rev": "62e7920+dirty",
-  "stamp": "git 62e7920+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
+  "git_rev": "c07ac02+dirty",
+  "stamp": "git c07ac02+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
   "stages_run": [
     "frames",
     "gif",
@@ -54,7 +54,7 @@
     ],
     "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git 62e7920+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
+      "POLYMESH_CINEMA_STAMP": "git c07ac02+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",

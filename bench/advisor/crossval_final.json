@@ -1,6 +1,6 @@
 {
   "provenance": {
-    "git_revision": "f372e839793994f08bf73776fdf06cb1fa3b4174-dirty",
+    "git_revision": "67f0a8b82e536767e8db19ee8a821411dc570bd2-dirty",
     "created_utc": "2026-08-13T12:20:54Z",
     "python": "3.11.9",
     "numpy": "2.4.4",

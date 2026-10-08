@@ -1,28 +1,24 @@
 # CONTRIBUTING — Codebase map & standards
 
-**Root markdown allowed:** `README.md`, `CONTRIBUTING.md`, `CHANGES.md`, and `CLAUDE.md` (agent-harness entrypoint). Other markdown lives under `docs/`, or as a `README.md` beside the data it describes (`bench/**`, `examples/`, `audits/`).  
-External-contributor PR flow: **[CHANGES.md](CHANGES.md)** (not for owner work on `master`).  
+**Root markdown allowed:** `README.md` and `CONTRIBUTING.md`. Other markdown lives under `docs/`, or as a `README.md` beside the data it describes (`bench/**`, `examples/`, `audits/`).  
 Current state and next work: **[docs/STATUS.md](docs/STATUS.md)**.
 
-This file is the onboarding map for **humans and AI agents**. Read it before grepping the whole tree.
+This file is the onboarding map for contributors. Read it before grepping the whole tree.
 
 ---
 
-## 0. Workflow (humans and AI agents)
-
-Agent-driven contributions are welcome; agents follow the same rules as humans.
+## 0. Workflow
 
 | Step | Rule |
 |---|---|
-| Sync first | `git fetch origin`, `git status`, `git pull --rebase origin master` before reading deeply or editing (external contributors: branch setup in [CHANGES.md](CHANGES.md)). Never work on a stale or dirty tree; resolve rebase conflicts (or stop and ask) first. Pull again right before pushing; never force-push `master`. |
-| Honest authorship | Owner work commits as **Hunter-124**; external contributors commit as themselves ([CHANGES.md](CHANGES.md)). Verify with `git config user.name && git config user.email` before the first commit. No AI-attribution trailers (`Co-Authored-By`, "Generated with …"). |
-| Confirm irreversible steps | Agents state the action and scope and get an explicit go-ahead before pushing, rewriting history, or deleting files — every time. |
-| Find your way | This file (§2–3), then `graphify query "<question>"` against `graphify-out/` (§8) before full-repo greps. |
+| Sync first | `git fetch origin`, `git status`, `git pull --rebase origin master` before reading deeply or editing. Never work on a stale or dirty tree; resolve rebase conflicts (or stop and ask) first. Pull again right before pushing; never force-push `master`. |
+| Honest authorship | Owner work commits as **Hunter-124**; external contributors commit as themselves. Verify with `git config user.name && git config user.email` before the first commit. |
+| Find your way | This file (§2–3) before full-repo greps. |
 | Pick work | [docs/STATUS.md](docs/STATUS.md) (open defects, next items). Methodology in force: [docs/plans/advisor-measure-first-program.md](docs/plans/advisor-measure-first-program.md) (ADR-0023/0024). Small fixes outside the list are fine. |
 | Interfaces are contracts | Anything crossing the test-lab / GUI / campaign-analysis boundary uses the schemas in [docs/dag/interfaces.md](docs/dag/interfaces.md). Change a schema only in the same commit as both sides of the code. |
 | Anti-cheat | §4. Never "fix" a failing benchmark by nudging the expected value; PRs that do this are closed. |
-| Verification bar | Clean `-Werror` build; full Catch2 suite green, run from the repo root; docs/ADR updated; `graphify update .` run and committed if the change is structural. |
-| Submit | External contributors: clone → branch → PR per [CHANGES.md](CHANGES.md); say in the PR body what was changed and how it was verified. |
+| Verification bar | Clean `-Werror` build; full Catch2 suite green, run from the repo root; docs/ADR updated. |
+| Submit | External contributors: branch from current `master` in a real clone of this repo (not a zip or a copy of someone else's tree), one logical change per PR, never commit `build/`, secrets or binary dumps. Prefer merging `master` into your branch over rebasing unrelated history. Say in the PR body what was changed and how it was verified. |
 
 ---
 
@@ -62,8 +58,6 @@ ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
 .
 ├── README.md                 # product + build + measured evidence
 ├── CONTRIBUTING.md           # THIS FILE — map & standards
-├── CHANGES.md                # external-contributor PR workflow (clone → branch → PR)
-├── CLAUDE.md                 # agent-harness entrypoint (links here + docs/STATUS.md)
 ├── LICENSE                   # BSD-3-Clause
 ├── CMakeLists.txt            # root build: options, dependency resolution, add_subdirectory
 ├── CMakePresets.json         # configure/build/test presets (release, debug, CI, Windows)
@@ -110,8 +104,6 @@ ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
 │   ├── gui/                  # theme/layout notes
 │   ├── assets/               # showcase / cinema media + provenance
 │   └── archive/              # frozen history (old plans, phases, board, research)
-│
-└── graphify-out/             # committed knowledge graph for agents
 ```
 
 ### Dependency direction (do not invert)
@@ -158,7 +150,6 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 | Field-level verification of shipped solves | `scripts/verify_fields.py` + `docs/validation/field-verification.md` |
 | Physics/math decisions | `docs/decisions/NNNN-*.md` (ADR) |
 | Current status / next work | `docs/STATUS.md` |
-| Agent knowledge graph | `graphify-out/` + `/graphify` skill |
 
 ---
 
@@ -200,8 +191,6 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 |---|---|
 | Product pitch + build + measured evidence | `README.md` |
 | Map + standards | `CONTRIBUTING.md` (this file) |
-| Agent-harness entrypoint (links only) | `CLAUDE.md` |
-| External-contributor PR / clone / merge | `CHANGES.md` |
 | Current state, open defects, next work | `docs/STATUS.md` (the only status page) |
 | Reference (CLI, solver core, benchmarks) | `docs/*.md` |
 | One decision = one short ADR (body frozen once accepted) | `docs/decisions/` |
@@ -216,7 +205,7 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 
 ---
 
-## 6. How to add a feature (agent checklist)
+## 6. How to add a feature (checklist)
 
 1. Read this file + relevant ADR + `docs/STATUS.md` for the subsystem you touch.
 2. Put code in the correct layer (§2–3). No new root clutter.
@@ -225,7 +214,6 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 5. Grep audit: no `bench/reference` reads outside `src/bench` / tests.
 6. Short ADR if you chose among real design alternatives.
 7. Update `docs/STATUS.md` (and the evidence doc it links) if results move.
-8. If graph-worthy structure change: `graphify update .` and commit `graphify-out/` (§8).
 
 ---
 
@@ -238,69 +226,19 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 
 ---
 
-## 8. Graphify (for agents)
-
-Shared knowledge graph so humans and agents navigate the codebase without full-repo greps. **Commit the portable artifacts**; regenerate machine-local views.
-
-### What is version-controlled
-
-| Path | Commit? | Role |
-|---|---|---|
-| `graphify-out/graph.json` | **yes** | Graph data (query / path / explain) |
-| `graphify-out/GRAPH_REPORT.md` | **yes** | Communities, god nodes, audit |
-| `graphify-out/.graphify_labels.json` | **yes** | Community names for viz / report |
-| `graphify-out/manifest.json` | **yes** | File inventory for `--update` |
-| `graphify-out/graph.html` | no (gitignored) | Interactive browser view — regenerate |
-| `graphify-out/cache/` | no | Semantic extraction cache |
-| `graphify-out/.graphify_python` | no | Local interpreter path |
-| `graphify-out/.graphify_root` | no | Absolute scan root |
-| `graphify-out/cost.json` | no | Local token accounting |
-
-### Setup (once per clone)
-
-```sh
-# install CLI (pick one)
-uv tool install graphifyy          # preferred
-# pip install graphifyy
-
-graphify hook install              # post-commit AST rebuild + post-checkout
-git config merge.graphify.driver "graphify merge-driver %O %A %B"  # union-merge graph.json
-graphify export html               # optional local browser viz
-```
-
-`.gitattributes` maps `graphify-out/graph.json` to the `graphify` merge driver so concurrent graph updates union-merge instead of conflict soup.
-
-### Keep the graph current
-
-| Change type | Command |
-|---|---|
-| Code edits (typical) | `graphify update .` — AST only, no LLM/API key |
-| After commit (if hook installed) | automatic for code paths under the post-commit hook |
-| Docs / ADRs / large renames | `/graphify .` or `/graphify --update` (semantic refresh) |
-| Force shrink after deletions | `graphify update . --force` |
-
-Prefer `graphify query "…"`, `graphify path "A" "B"`, `graphify explain "X"` over blind greps when `graphify-out/graph.json` exists. Skip the hook for a one-off commit with `GRAPHIFY_SKIP_HOOK=1`.
-
-### PR hygiene
-
-If your PR changes public structure (new libs, renames, major call graph), include an updated `graphify-out/` in the same PR (or run `graphify update .` and commit the result). Doc-only PRs do not need a graph refresh.
-
----
-
-## 9. Frozen baselines
+## 8. Frozen baselines
 
 - **P1 solver baseline** (tet4/10, hex8/20 isoparametric path, Tier-0/1 cases): frozen as the comparator after GATE 1. Improve **alongside** (new elements, new mesher paths), do not silently retune tests to hide regressions.
 
 ---
 
-## 10. Quick “I am lost” paths
+## 9. Quick “I am lost” paths
 
 | Feeling | Action |
 |---|---|
 | Don’t know folder | §2 layout + §3 table |
-| External PR / wrong clone | `CHANGES.md` (agents) |
+| External PR / wrong clone | §0 Submit |
 | Don’t know current state / what to work on | `docs/STATUS.md` |
 | Don’t know why a choice | `docs/decisions/` |
-| Don’t know who calls what | `graphify-out/` / graphify query |
 | Touching Eigen inverse | §4 Eigen traps |
 | Touching benchmarks | §4 anti-cheat + `docs/benchmarks.md` |

@@ -88,8 +88,7 @@ later.
 - Four pairs still differ from MSVC and cannot be diagnosed further here: the
   two Linux toolchains now agree bit for bit, so whatever remains is MSVC-side
   (libm, or an OCC version difference on the laptop) and needs that machine to
-  investigate. Labelling standardises on gcc for this reason —
-  `docs/training/ACCESS-hunter-pc.md` §4.1.
+  investigate. Labelling standardises on gcc for this reason.
 - 409/409 ctest pass on the fixed tree.
 
 ## Amendment 2026-08-21: an unstable sort is the same defect

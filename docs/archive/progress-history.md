@@ -1,11 +1,11 @@
 # Progress history
 
-Frozen history as of `ef464dc`, moved verbatim from `docs/progress.md` (links re-pointed for the new depth); current status is [`docs/STATUS.md`](../STATUS.md).
+Frozen history as of `85f2b16`, moved verbatim from `docs/progress.md` (links re-pointed for the new depth); current status is [`docs/STATUS.md`](../STATUS.md).
 
 ## 2026-09-11 — CAD integration dependency release
 
 The `cad-fill-progress` branch publishes the CAD-required source update from the
-already-public `9554579` baseline without replacing the separate product-release
+already-public `c855895` baseline without replacing the separate product-release
 history on `master`. Project-specific commentary and private commit metadata are
 not part of this source-only update.
 
@@ -53,9 +53,7 @@ tracker) ·
 [0035](../decisions/0035-boundary-conformity.md) ·
 [0036](../decisions/0036-a-symmetric-part-gets-a-symmetric-tiling.md)  
 **Training box:** [`docs/training/HANDOFF-3080ti.md`](training/HANDOFF-3080ti.md)
-· `docs/training/ACCESS-hunter-pc.md` (removed; `git show ef464dc:docs/training/ACCESS-hunter-pc.md`)  
-**Roadmap:** `docs/ROADMAP.md` (removed; `git show ef464dc:docs/ROADMAP.md`) · **Agent loop:**
-`docs/process/agent-loop.md` (removed; `git show ef464dc:docs/process/agent-loop.md`)
+· **Roadmap:** `docs/ROADMAP.md` (removed; `git show 85f2b16:docs/ROADMAP.md`)
 
 **The 2026-07-13 measure-first / CVT board is finished and frozen.**
 [`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml) is a historical record, not the
@@ -91,16 +89,14 @@ suite 257/257 green (OCC on). STL box/smoke tests migrated to in-memory
 `testsupport::box_model` / `model_from_surface(load_stl(...))`; cantilever+smoke_bar
 cases regenerated as STEP.
 
-**Curved-import fidelity + diagnostics + self-improve loop (2026-07-14):** Fixed
+**Curved-import fidelity + diagnostics (2026-07-14):** Fixed
 coarse pipe faceting — CAD tessellation angular deflection 0.5→0.2 rad (+ finer
 linear sag), `CadModel::tessellate(deflection, angular_deflection)`; a cylinder
 wall now tessellates < 1% chord deviation (`test_geometry_fidelity`). Fixed the
 GUI crash `local_refine_tets: non-positive child volume`: LEB now skips a
 terminal edge whose best midpoint would invert a sliver child instead of
 aborting the mesh (sliver-safe, still conforming; `n_skipped_slivers`). New
-`polymesh diag <part> --json` emits fidelity/quality/timing/throughput; new
-`scripts/self_improve.sh [--backend omp|grok]` runs a brief CAD battery →
-report → LLM CLI edits the meshers (GUI "self-improve" buttons launch it). Large
+`polymesh diag <part> --json` emits fidelity/quality/timing/throughput. Large
 curved fixture `tests/fixtures/parts/pipe.step` (Ø60×400) added; LEB robustness
 test on it. Full suite 259/259 green (OCC on).
 
@@ -507,7 +503,7 @@ GATE 0 was approved by owner on 2026-07-09.
   0.02` vs required wall travel; next thread is the size field, not the snap).
   Advisor labels carrying element counts for folded hybrid meshes are stale —
   corpus regeneration required before the next retrain. Suite 409/409; library
-  embeddable, builds on Eigen 3.4 (`aa5ae76`).
+  embeddable, builds on Eigen 3.4 (`2ead64f`).
 - 2026-08-14: **v4 corpus regeneration + retrain
   ([`docs/advisor/0008-v4-corpus-retrain.md`](../advisor/0008-v4-corpus-retrain.md))**
   — all MSVC-era v3 rows archived under `bench/campaigns/archive-v4/`; 3,528
@@ -598,18 +594,18 @@ GATE 0 was approved by owner on 2026-07-09.
   — first trained model (training log M-A1): 24 procedural parts × 3 loads = 72
   cases, batch 1 1536/1536 pairs, truth coverage 67/72; inference ships through
   ONNX Runtime CPU. Advisor picks meshes ~6× more accurate than the default
-  where truth is real (`7cfaabf`). Also: solve imported Gmsh `.msh` meshes; tet10
-  mid-node import order fixed (`92455f9`).
+  where truth is real (`33c79ef`). Also: solve imported Gmsh `.msh` meshes; tet10
+  mid-node import order fixed (`c6cd527`).
 - 2026-08-09: **ADR-0026 variable-everything wave 1** — anisotropic metric
   contract shipped as `adapt::Metric3d` + `adapt::MetricGrid`; real scalar size
   fields now reach the graded/hybrid meshers via `mesh::SizeFieldFn`
   (field-derived levels replace the binary ball test, 2:1 conformity preserved);
-  exact packed RVD cells admitted (`46cbdc1`); OpenCASCADE enabled on Windows.
+  exact packed RVD cells admitted (`876f577`); OpenCASCADE enabled on Windows.
 - 2026-07-14: **CVT poly mesher perf + poly VEM stress** — neighbour-restricted
   clipping O(N²)→O(N·k); export emits one polyhedron per site (was fragmented
   per tet); GUI renders polyhedral cells as true polygon facets; poly VEM
   recovers von Mises stress (was identically 0) + direct solver for VEM
-  (`2789062`, `d0ec1ad`, `0e0532e`, `e57f73b`).
+  (`8078524`, `53fd595`, `c4f4ac4`, `32b3f68`).
 - 2026-07-13: **G1–G4 done (CVT critical path)** —
   - G1: Geogram Delaunay+Predicates PSMs, `clip_convex_cell`, unit-cube smoke
   - G2: `lloyd_cvt` + ρ=1/h³ (`SizeFieldFn` same contract as N_pred)
@@ -642,7 +638,7 @@ GATE 0 was approved by owner on 2026-07-09.
 - 2026-07-13: **M9 baseline freeze** — campaign `bench/campaigns/varyhedron-baseline-m9/`
   (4 STEP × varyhedron+hybrid_zoo × 1 tier h_scale=5.0 = 8 runs; warehouse +
   analyze + HANDOFF). **ok_rate 75%** (6/8); both cylinder runs `solve_suspect`
-  (load_area gate). Code SHA `dcb2baa`; metric schema `scorecard-m1-m8-v1`.
+  (load_area gate). Code SHA `78a6dfe`; metric schema `scorecard-m1-m8-v1`.
   Canonical note: [`BASELINE.md`](../../bench/campaigns/varyhedron-baseline-m9/BASELINE.md).
   Packing deltas vs this freeze only; next **M10**.
 - 2026-07-12: **M12 partial — expected_area on planar STEP loads** —
@@ -653,14 +649,14 @@ GATE 0 was approved by owner on 2026-07-09.
 - 2026-07-12: **M6–M8 measure substrate complete** — element-centroid face-mean VM +
   strain_energy scoring (drop raw nodal max); OCC κ + mesh-segment chordal e;
   protecting balls r=min(αh, β·lfs) + corner shrink. PROGRAM nodes done; next is M9 freeze.
-- 2026-07-12: **Program board notes polished for agents** — every open M6–M14 /
+- 2026-07-12: **Program board notes polished** — every open M6–M14 /
   G0–G4 note cites ADR-0024 Q# + `docs/plans/advisor-measure-first-program.md`;
   V11 dual hard-block until G4 + no packing loops until M9; V6d keeps M1 dep +
   curved boundary before p>1.
-- 2026-07-12: **Advisor plan fully documented for agents** — canonical
+- 2026-07-12: **Advisor plan fully documented** — canonical
   `docs/plans/advisor-measure-first-program.md`; ADR-0024 full Q1–Q10;
-  PROGRAM.yaml nodes M6–M14 + G0–G4; README / CLAUDE / CONTRIBUTING /
-  AGENT_BOOTSTRAP / ROADMAP / dag README all point at the plan. Order locked:
+  PROGRAM.yaml nodes M6–M14 + G0–G4; README / CONTRIBUTING / ROADMAP /
+  dag README all point at the plan. Order locked:
   freeze baseline → wall project → Geogram/CVT; dual hard-blocked; VEM gated.
 - 2026-07-12: **CadTopology sharp/smooth/seam edges** — `CadEdgeFeature` + dihedral
   classify in `extract_topology` (25° from flat); `edge_profile_hausdorff_filtered`,
@@ -676,11 +672,10 @@ GATE 0 was approved by owner on 2026-07-09.
   N_pred sizing → VEM gate); V6d/V6e/V11 rewired to depend on M1/M2. Do not
   run packing “improvement” loops until M1 health + face-mean probes land.
 - 2026-07-12: **Lane V wave — 100% smoke + orphan compact** — `NodalMesh::compact_unused_nodes` fixes singular K on varyhedron cylinder; testlab face/padded Dirichlet + direct LDLT; V1c BRep Model, V3c GUI HEAD, V4 CAD auto-h, V6c packing seeds, V9b warehouse shots; smoke 4/4 ok; varyhedron-short-1 running.
-- 2026-07-12: **Lane V docs/gates (V1d, V2d, V9b, V10d)** — product OCC docs
+- 2026-07-12: **Lane V docs/gates (V1d, V2d, V9b)** — product OCC docs
   (Ubuntu libocct + Fedora `opencascade-devel`); `check_no_product_stl.sh` +
-  CI; `warehouse_shots.py` mesh.vtu→wire.png; grok invoke force-push deny
-  confirmed.
-- 2026-07-12: **Varyhedron Jacobian-safe edge snap + smoke campaign** — soft CAD edge blend with volume-offender revert; first warehouse smoke (4 runs) + HANDOFF pack; coarser short-campaign tiers (h_scale 5/3.5/2.5).
+  CI; `warehouse_shots.py` mesh.vtu→wire.png.
+- 2026-07-12: **Varyhedron Jacobian-safe edge snap + smoke campaign** — soft CAD edge blend with volume-offender revert; first warehouse smoke (4 runs); coarser short-campaign tiers (h_scale 5/3.5/2.5).
 - 2026-07-12: **Varyhedron v1 path (V6a/V6b/V7)** — `VolumeMesher::kVaryhedron`,
   `mesh/varyhedron_fill` (CAD edge seeds + graded scaffold + edge-profile snap),
   GUI label/tooltip (ADR-0021), CLI/testlab `varyhedron`, smoke on
@@ -691,14 +686,13 @@ GATE 0 was approved by owner on 2026-07-09.
   `bench/campaigns/README.md` documents
   `runs/<cfg_id>/<part>/t<tier>/{mesh.vtu,wire.png,quality.json,result.json}`;
   skeleton `varyhedron-short-1` campaign (`warehouse` + `on_finish`
-  analyze/grok_handoff; 4 shape placeholders × varyhedron+hybrid_zoo × 3
+  analyze; 4 shape placeholders × varyhedron+hybrid_zoo × 3
   tiers `keep_frac: 1.0`). Writer is V3b; run is V8.
 - 2026-07-12: **Lane V program board (V0)** — ADRs 0020 (true BRep volume
   meshing), 0021 (varyhedron packing from day 1), 0022 (full experiment
-  warehouse + headless `grok -p --yolo` loop); ADR-0001 amended (OCC product
+  warehouse); ADR-0001 amended (OCC product
   path, STL compare-only); `docs/dag/PROGRAM.yaml` V0–V11 nodes;
-  interfaces §7–§8 warehouse/handoff; `docs/process/grok-loop.md`;
-  AGENT_BOOTSTRAP open-node list. Owner shapes: plate_hole, cylinder, sphere,
+  interfaces §7 warehouse. Owner shapes: plate_hole, cylinder, sphere,
   icecream_cone; meshers varyhedron + hybrid_zoo; ~3 runs/shape short campaigns.
 - 2026-07-12: **plate_hole outer-corner mesh artifacts** — `write_plate_hole`
   ray-to-rect top/bottom faces chord-cut the four rectangle corners and left
@@ -804,7 +798,7 @@ GATE 0 was approved by owner on 2026-07-09.
 - 2026-07-10: **Adaptive-core program bootstrapped** — repo-tracked DAG
   (`docs/dag/PROGRAM.yaml` + interfaces.md + README) as the pick-up-anywhere
   board; ADR-0019 (mixed FE+VEM, arbitrary-p hierarchical, min-rule
-  conforming, (h,p,shape) driver); CONTRIBUTING §0 AI-agent contributor quick
+  conforming, (h,p,shape) driver); CONTRIBUTING §0 contributor quick
   start. Test-lab harness, validation part library, and GUI panel rebuild
   under way in parallel (DAG lane A).
 - 2026-07-10: **Curvature-driven refinement + boundary finishing (bore/rim
@@ -902,10 +896,6 @@ GATE 0 was approved by owner on 2026-07-09.
   Replaces fine-global lattice + coarse-block aggregation. Boundary quads
   emitted per exterior coarse/fine face. **138/138** Catch2 green on related +
   full suite.
-- 2026-07-10: **Graphify shared workflow** — Rebuilt `graphify-out/` (AST +
-  docs); gitignore machine-local artifacts; CONTRIBUTING §8 + `CLAUDE.md`
-  document clone setup, `graphify update`, hooks, merge driver for concurrent
-  graph.json updates.
 - 2026-07-10: **Graded tet fix (size + speed + RAM)** — Dropped global \(h/4\)
   lattice when features/seeds active (was bulk only \(h/2\), 8× cells, thin plates
   fully fine → slow mesh + FEA OOM). Always **2:1** (bulk≈\(h\), fine≈\(h/2\));
@@ -1028,7 +1018,7 @@ GATE 0 was approved by owner on 2026-07-09.
   adapt loop early-stops when `global_eta ≤ eta_target`; CLI `--eta-target`;
   GUI η input near adapt passes; Catch2 early-stop + disabled-path tests.
 - 2026-07-10: CI green again — clang-format 18.1.8 pinned in workflow (was drift vs local), full tree reformat; rename `namespace pipe` alias in test_transition_fill (POSIX `pipe()` collision on Ubuntu).
-- 2026-07-10: Master ROADMAP + agent-loop protocol; GUI M1 path — argv open,
+- 2026-07-10: Master ROADMAP; GUI M1 path — argv open,
   mesh-only job + element-type preview, ZZ error field + colorbar, failure
   dismiss, public `unit_box.stl` fixture. (in progress / this commit)
 - 2026-07-10: A posteriori adapt seeds — Dörfler centroids → graded fine balls;
@@ -1050,7 +1040,7 @@ GATE 0 was approved by owner on 2026-07-09.
 - 2026-07-10: Product batch — VTU export, ZZ recovery + Dörfler marking,
   sharp-edge features + graded sizing, limited surface snap on tet fill,
   CLI `mesh`/`solve`, GUI STEP paths + theme switch + VTU export button,
-  linguist fix (graphify HTML vendored). 47/47 tests green.
+  linguist fix (HTML vendored). 47/47 tests green.
 - 2026-07-10: Optional OpenCASCADE STEP path — `geom::load_step`, CMake
   `POLYMESH_WITH_OCC` finds OCCT (TKDESTEP + BRepMesh), stub throws when OFF;
   Catch2 tests + unit-cube fixture.

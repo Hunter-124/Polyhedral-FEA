@@ -41,9 +41,9 @@ Other files in `bench/advisor/` (`crossval*.json`, `tolerance_selector*.json`,
 earlier generations; each file's `provenance` block names its dataset.
 Earlier-generation datasets and training runs, `bench/advisor/archive-v2/` …
 `archive-v7/` and `bench/campaigns/archive-v2/` … `archive-v7/` (removed from
-HEAD; `git show ef464dc:<path>`), together with `crossval_v3`–`v6`,
+HEAD; `git show 85f2b16:<path>`), together with `crossval_v3`–`v6`,
 `crossval_nogeo`, `crossval_geofeat` and `tolerance_selector_v4`–`v6` (removed
-from HEAD; `git show ef464dc:bench/advisor/<file>.json`), are still cited by the
+from HEAD; `git show 85f2b16:bench/advisor/<file>.json`), are still cited by the
 frozen reports 0006–0011.
 
 ## Series

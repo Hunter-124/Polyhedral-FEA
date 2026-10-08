@@ -3,7 +3,7 @@
 - Status: accepted (2026-08-13); complete — references replaced, engine fixes shipped, and corpus regeneration plus the v2→v3→v4 retrains landed ([advisor 0006–0008](../advisor/0008-v4-corpus-retrain.md))
 - Decision: D29
 - Related: ADR-0023 (measure-first), ADR-0024 (advisor measure answers), ADR-0027 (learned advisor), ADR-0028 (boundary-conformance hardening)
-- Evidence: commits `625b26a`, `f238bc3`, `74fbc06`, `8e8806b`, `895f46b`, `eada0a0`, `b37a2df`, `8e8bcb9`, `eb7d8ae`, `76ecdf3`; [`bench/reference/external/`](../../bench/reference/external); [`bench/advisor/corpus_evidence.json`](../../bench/advisor/corpus_evidence.json); [`apps/testlab/load_area.hpp`](../../apps/testlab/load_area.hpp); [`tests/test_load_area_gate.cpp`](../../tests/test_load_area_gate.cpp); [`tests/test_truth_guard.cpp`](../../tests/test_truth_guard.cpp); [`tests/test_run_artifacts.cpp`](../../tests/test_run_artifacts.cpp)
+- Evidence: commits `31bcd19`, `7cddb59`, `8062bdc`, `861794a`, `0c17046`, `ab6504b`, `c8c1925`, `98a4058`, `eea715a`, `c21aa90`; [`bench/reference/external/`](../../bench/reference/external); [`bench/advisor/corpus_evidence.json`](../../bench/advisor/corpus_evidence.json); [`apps/testlab/load_area.hpp`](../../apps/testlab/load_area.hpp); [`tests/test_load_area_gate.cpp`](../../tests/test_load_area_gate.cpp); [`tests/test_truth_guard.cpp`](../../tests/test_truth_guard.cpp); [`tests/test_run_artifacts.cpp`](../../tests/test_run_artifacts.cpp)
 
 ## Context
 
@@ -127,7 +127,7 @@ cases were predicted unaffected *before* the fix, because the tube load slab was
 sized so the wall ring is empty, and they are bit-identical. A prediction that
 could have failed and did not is what makes the diagnosis credible.
 
-Evidence: commit `76ecdf3`;
+Evidence: commit `c21aa90`;
 `supporting_verification.load_selection_caveat_cases` in
 [`external-truth-findings.json`](../../bench/reference/external/external-truth-findings.json);
 `provenance.load.end_face_vs_selected_rel_diff` in every
@@ -172,10 +172,10 @@ why it is recorded as a rule rather than a bug:
   inputs before writing anything, cannot emit a zero-case artifact, refuses on
   four named paths with exit 2 and no write, asserts coverage of all 96 cases, and
   stamps `complete=false` with `cases_missing_from_inputs` when `--allow-partial`
-  is used (commit `eb7d8ae`).
+  is used (commit `eea715a`).
 - `scripts/verify_artifact_guard.py`, written to verify the guard in §5, set
   `skin_layers` to 0, which testlab correctly rejects during grid validation, so
-  it aborted before reaching the thing it verified (commit `76ecdf3`).
+  it aborted before reaching the thing it verified (commit `c21aa90`).
 
 Evidence: [`apps/testlab/load_area.hpp`](../../apps/testlab/load_area.hpp) states
 the policy and its reasoning;
@@ -212,7 +212,7 @@ check-after-flush idiom. An artifact failure is reported on stderr and the row i
 still recorded. `scripts/advisor/rebuild_results.py` can reconstruct
 `results.jsonl` from surviving per-run `result.json` files.
 
-Evidence: commit `76ecdf3`;
+Evidence: commit `c21aa90`;
 [`tests/test_run_artifacts.cpp`](../../tests/test_run_artifacts.cpp);
 `scripts/verify_artifact_guard.py` obstructs the artifact path and asserts exit 0,
 the row still recorded, the failure reported, and no abort.
@@ -277,7 +277,7 @@ discarded the external answers for first-order surrogates. It enforces the same
 allowlist from the same module. `scripts/truth_guard.py` holds that allowlist once
 — copying it into each caller would reintroduce the drift it exists to prevent.
 
-Evidence: commit `8e8806b`;
+Evidence: commit `861794a`;
 [`scripts/truth_guard.py`](../../scripts/truth_guard.py);
 [`tests/test_truth_guard.cpp`](../../tests/test_truth_guard.cpp), whose live-artefact
 case asserts that no `analytic` or `external-*` truth in the committed corpus is
@@ -300,7 +300,7 @@ written to `answers`, so those rows were permanently unscoreable. The invariant 
 now stated at the write site: `answers` must carry every field `evaluate_probe` can
 read.
 
-Evidence: commit `74fbc06`; equivalence was proven over 2,314 archived rows against
+Evidence: commit `8062bdc`; equivalence was proven over 2,314 archived rows against
 the references they were originally scored against before the re-derivation was
 relied on.
 

@@ -58,15 +58,11 @@ double box_lower_bound(const Eigen::Vector3d& p, const FaceBox& b) {
     return d.norm();
 }
 
-/// Outward-ish unit normal at 3D point `q` from a face's surface + orientation
-/// (UV via surface project). Split from the face so the cached index can hand
-/// over a pre-built surface handle and adaptor.
-bool face_normal_at(const Handle(Geom_Surface) & surf, const BRepAdaptor_Surface& asurf,
-                    TopAbs_Orientation orientation, const gp_Pnt& q, gp_Vec& n_out) {
-    if (surf.IsNull()) {
-        return false;
-    }
-    GeomAPI_ProjectPointOnSurf proj(q, surf);
+/// Outward-ish unit normal at the lowest-distance solution of a finished
+/// projection onto a face's surface.
+bool normal_at_projection(const GeomAPI_ProjectPointOnSurf& proj,
+                          const BRepAdaptor_Surface& asurf, TopAbs_Orientation orientation,
+                          gp_Vec& n_out) {
     if (proj.NbPoints() < 1) {
         return false;
     }
@@ -86,6 +82,17 @@ bool face_normal_at(const Handle(Geom_Surface) & surf, const BRepAdaptor_Surface
     }
     n_out = n;
     return true;
+}
+
+/// Outward-ish unit normal at 3D point `q` from a face's surface + orientation
+/// (UV via surface project).
+bool face_normal_at(const Handle(Geom_Surface) & surf, const BRepAdaptor_Surface& asurf,
+                    TopAbs_Orientation orientation, const gp_Pnt& q, gp_Vec& n_out) {
+    if (surf.IsNull()) {
+        return false;
+    }
+    GeomAPI_ProjectPointOnSurf proj(q, surf);
+    return normal_at_projection(proj, asurf, orientation, n_out);
 }
 
 /// Uncached variant for the whole-shape fallback, whose support face is not
@@ -129,6 +136,11 @@ struct BrepFaceIndex {
     std::vector<Handle(BRepAdaptor_Surface)> adaptors;
     /// One solver per face; `unique_ptr` keeps the cached OCC maps put.
     std::vector<std::unique_ptr<BRepExtrema_DistShapeShape>> solvers;
+    /// One surface projector per face, initialised on first use. Constructing a
+    /// GeomAPI_ProjectPointOnSurf per query re-samples the surface's whole
+    /// extrema grid; Init once + Perform per query reuses it with identical
+    /// solutions (same adaptor, bounds, tolerance and algorithm).
+    mutable std::vector<std::unique_ptr<GeomAPI_ProjectPointOnSurf>> projectors;
     /// Faces with no usable AABB — always solved, never culled.
     std::vector<std::uint32_t> unbounded;
 
@@ -154,6 +166,7 @@ struct BrepFaceIndex {
         surfaces.clear();
         adaptors.clear();
         solvers.clear();
+        projectors.clear();
         unbounded.clear();
         bins.clear();
         seen.clear();
@@ -188,6 +201,7 @@ struct BrepFaceIndex {
         surfaces.resize(nf);
         adaptors.resize(nf);
         solvers.resize(nf);
+        projectors.resize(nf);
         seen.assign(nf, 0);
 
         constexpr double kInf = std::numeric_limits<double>::infinity();
@@ -265,7 +279,19 @@ struct BrepFaceIndex {
     }
 
     bool face_normal(std::size_t f, const gp_Pnt& q, gp_Vec& n_out) const {
-        return face_normal_at(surfaces[f], *adaptors[f], faces[f].Orientation(), q, n_out);
+        const Handle(Geom_Surface)& surf = surfaces[f];
+        if (surf.IsNull()) {
+            return false;
+        }
+        std::unique_ptr<GeomAPI_ProjectPointOnSurf>& proj = projectors[f];
+        if (!proj) {
+            Standard_Real u0 = 0.0, u1 = 0.0, v0 = 0.0, v1 = 0.0;
+            surf->Bounds(u0, u1, v0, v1);
+            proj = std::make_unique<GeomAPI_ProjectPointOnSurf>();
+            proj->Init(surf, u0, u1, v0, v1, Precision::Confusion());
+        }
+        proj->Perform(q);
+        return normal_at_projection(*proj, *adaptors[f], faces[f].Orientation(), n_out);
     }
 
     /// Closest point on one trimmed face via the face's persistent extrema

@@ -9,23 +9,35 @@
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
+#include <BRepClass_FaceClassifier.hxx>
+#include <BRepClass_FaceExplorer.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
+#include <BRepExtrema_ExtPC.hxx>
+#include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
+#include <Extrema_ExtPS.hxx>
+#include <Geom2d_Curve.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Geom_Surface.hxx>
+#include <OSD_ThreadPool.hxx>
 #include <Precision.hxx>
+#include <Standard_Failure.hxx>
 #include <TopAbs.hxx>
 #include <TopAbs_Orientation.hxx>
 #include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
+#include <TopoDS_Iterator.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Vertex.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Pnt2d.hxx>
 #include <gp_Vec.hxx>
 
 #include <algorithm>
@@ -106,11 +118,400 @@ bool face_normal_at(const TopoDS_Face& face, const gp_Pnt& q, gp_Vec& n_out) {
     return face_normal_at(surf, asurf, face.Orientation(), q, n_out);
 }
 
+// ---------------------------------------------------------------------------
+// Cached replica of BRepExtrema_DistShapeShape(vertex, face | edge).
+//
+// A fresh solve pays for an adaptor, UV bounds, an Extrema grid and a
+// BRepClass_FaceClassifier walk of every pcurve on every query (OCCT 7.9
+// BRepExtrema_ExtPF / DistanceSS). The probes below build those once per face
+// or edge and replay the solver's algorithm on top of them: the same sub-shape
+// maps and order, the same Extrema setup, the same box pruning, the same
+// eps merge of the solution list (including the round-robin task layout of
+// DistanceMapMap, which fixes which tied solution comes first), and the same
+// BRepClass classification, run on a per-face explorer that keeps its UV
+// bounds instead of a fresh one per call.
+// ---------------------------------------------------------------------------
+
+/// BRepExtrema_DistShapeShape's default myEps.
+constexpr double kDistEps = Precision::Confusion();
+
+struct DistSolution {
+    double dist = 0.0;
+    gp_Pnt point;
+    TopoDS_Shape support;
+};
+
+/// myDistRef plus the shape-2 solution list, for the whole solve or one task.
+struct DistState {
+    double ref = 0.0;
+    std::vector<DistSolution> sols;
+
+    /// Merge one result the way every functor and map merge does. `take_ref`
+    /// is DistanceVertVert's merge, which adopts a within-eps distance even
+    /// when it is the larger one.
+    void merge(double d, const std::vector<DistSolution>& more, bool take_ref = false) {
+        if (d < ref - kDistEps) {
+            sols = more;
+            ref = d;
+        } else if (std::abs(d - ref) < kDistEps) {
+            sols.insert(sols.end(), more.begin(), more.end());
+            if (take_ref || ref > d) {
+                ref = d;
+            }
+        }
+    }
+};
+
+/// DistanceSS's TRI_SOLUTION: true when `p` is not already in `sols`.
+bool new_solution_point(const std::vector<DistSolution>& sols, const gp_Pnt& p) {
+    return std::none_of(sols.begin(), sols.end(), [&](const DistSolution& s) {
+        return s.point.Distance(p) <= Precision::Confusion();
+    });
+}
+
+/// The query point as DistShapeShape's shape 1.
+struct VertexQuery {
+    TopoDS_Vertex vtx;
+    gp_Pnt p;
+    Bnd_Box box; ///< BRepBndLib box of the vertex (myBV1)
+};
+
+VertexQuery make_vertex_query(const Eigen::Vector3d& q) {
+    VertexQuery query;
+    query.p = gp_Pnt(q.x(), q.y(), q.z());
+    BRep_Builder builder;
+    builder.MakeVertex(query.vtx, query.p, Precision::Confusion());
+    BRepBndLib::Add(query.vtx, query.box);
+    return query;
+}
+
+/// One edge as a shape-2 sub-shape: a persistent BRepExtrema_ExtPC plus what
+/// DistanceSS's vertex-edge branch reads per solution.
+struct EdgeProbe {
+    struct End {
+        double param = 0.0;
+        gp_Pnt point;
+        double tol = 0.0;
+    };
+
+    TopoDS_Edge edge;
+    bool degenerated = false;
+    Bnd_Box box; ///< BRepBndLib box (myBE2)
+    BRepExtrema_ExtPC ext;
+    std::vector<End> ends; ///< TopoDS_Iterator order, as isOnBoundary walks them
+    bool ends_cached = false;
+
+    explicit EdgeProbe(const TopoDS_Edge& e) : edge(e) {
+        BRepBndLib::Add(edge, box);
+        degenerated = BRep_Tool::Degenerated(edge);
+        if (degenerated) {
+            return;
+        }
+        ext.Initialize(edge);
+        try {
+            for (TopoDS_Iterator it(edge); it.More(); it.Next()) {
+                const TopoDS_Vertex& v = TopoDS::Vertex(it.Value());
+                ends.push_back({BRep_Tool::Parameter(v, edge), BRep_Tool::Pnt(v),
+                                BRep_Tool::Tolerance(v)});
+            }
+            ends_cached = true;
+        } catch (const Standard_Failure&) {
+            ends.clear(); // a vertex without a parameter: look it up live, as OCCT does
+        }
+    }
+
+    /// DistanceSS::Perform(vertex, edge) against reference `dst_ref`.
+    /// Returns false when it records nothing (myModif false).
+    bool solve(const VertexQuery& q, double dst_ref, double& value,
+               std::vector<DistSolution>& seq) {
+        seq.clear();
+        if (q.box.Distance(box) - dst_ref > kDistEps || degenerated) {
+            return false;
+        }
+        ext.Perform(q.vtx);
+        const int n = ext.IsDone() ? ext.NbExt() : 0;
+        if (n <= 0) {
+            return false;
+        }
+        double dmin = ext.SquareDistance(1);
+        for (int i = 2; i <= n; ++i) {
+            dmin = std::min(dmin, ext.SquareDistance(i));
+        }
+        dmin = std::sqrt(dmin);
+        if (!(dmin < dst_ref - kDistEps || std::abs(dmin - dst_ref) < kDistEps)) {
+            return false;
+        }
+        value = dst_ref;
+        for (int i = 1; i <= n; ++i) {
+            if (!(std::abs(dmin - std::sqrt(ext.SquareDistance(i))) < kDistEps)) {
+                continue;
+            }
+            const gp_Pnt pt = ext.Point(i);
+            if (!new_solution_point(seq, pt) || on_end_vertex(pt, ext.Parameter(i))) {
+                continue;
+            }
+            value = std::min(value, dmin);
+            seq.push_back({dmin, pt, edge});
+        }
+        return !seq.empty();
+    }
+
+    /// DistanceSS's isOnBoundary with Precision::PConfusion().
+    bool on_end_vertex(const gp_Pnt& pt, double t) const {
+        if (!ends_cached) {
+            for (TopoDS_Iterator it(edge); it.More(); it.Next()) {
+                const TopoDS_Vertex& v = TopoDS::Vertex(it.Value());
+                if (std::abs(BRep_Tool::Parameter(v, edge) - t) < Precision::PConfusion() &&
+                    BRep_Tool::Pnt(v).Distance(pt) < BRep_Tool::Tolerance(v)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return std::any_of(ends.begin(), ends.end(), [&](const End& end) {
+            return std::abs(end.param - t) < Precision::PConfusion() &&
+                   end.point.Distance(pt) < end.tol;
+        });
+    }
+};
+
+/// The face BRepClass walks for `face`. A planar face's edges often store no
+/// pcurve, and BRep_Tool::CurveOnSurface then re-projects the 3D curve onto the
+/// plane on every call. This copy (shared geometry, own topology) stores exactly
+/// those projections with the ranges CurveOnPlane reports, so the classifier
+/// reads the same 2D curves without rebuilding them. The model's shape is never
+/// touched; any failure falls back to `face` itself.
+TopoDS_Face classifier_face(const TopoDS_Face& face) {
+    try {
+        bool any_missing = false;
+        for (TopExp_Explorer it(face, TopAbs_EDGE); it.More() && !any_missing; it.Next()) {
+            Standard_Real f = 0.0, l = 0.0;
+            Standard_Boolean stored = Standard_True;
+            const Handle(Geom2d_Curve) pc =
+                BRep_Tool::CurveOnSurface(TopoDS::Edge(it.Current()), face, f, l, &stored);
+            any_missing = !stored && !pc.IsNull();
+        }
+        if (!any_missing) {
+            return face;
+        }
+        BRepBuilderAPI_Copy copier(face, /*copyGeom=*/Standard_False,
+                                   /*copyMesh=*/Standard_False);
+        const TopoDS_Face copy = TopoDS::Face(copier.Shape());
+        BRep_Builder builder;
+        for (TopExp_Explorer it(copy, TopAbs_EDGE); it.More(); it.Next()) {
+            const TopoDS_Edge& edge = TopoDS::Edge(it.Current());
+            Standard_Real f = 0.0, l = 0.0;
+            Standard_Boolean stored = Standard_True;
+            const Handle(Geom2d_Curve) pc =
+                BRep_Tool::CurveOnSurface(edge, copy, f, l, &stored);
+            if (!stored && !pc.IsNull()) {
+                builder.UpdateEdge(edge, pc, copy, BRep_Tool::Tolerance(edge));
+                builder.Range(edge, copy, f, l);
+            }
+        }
+        return copy;
+    } catch (const Standard_Failure&) {
+        return face;
+    }
+}
+
+/// The face part of a face shape 2: BRepExtrema_ExtPF's surface extrema and
+/// BRepClass_FaceClassifier's explorer, set up once.
+struct FaceProbe {
+    TopoDS_Face face;
+    Bnd_Box box; ///< BRepBndLib box (myBF2)
+    Handle(BRepAdaptor_Surface) surf;
+    Extrema_ExtPS ext;
+    bool ext_ready = false;
+    double tol = 0.0;
+    BRepClass_FaceExplorer explorer;
+    BRepClass_FaceClassifier classifier;
+
+    explicit FaceProbe(const TopoDS_Face& f) : face(f), explorer(classifier_face(f)) {
+        BRepBndLib::Add(face, box);
+        tol = BRep_Tool::Tolerance(face);
+        // BRepExtrema_ExtPF::Initialize, flag MINMAX and algo Grad being
+        // DistShapeShape's defaults.
+        surf = new BRepAdaptor_Surface(face, Standard_False);
+        if (surf->GetType() == GeomAbs_OtherSurface) {
+            return;
+        }
+        const double t = std::min(tol, Precision::Confusion());
+        const double tol_u = std::max(surf->UResolution(t), Precision::PConfusion());
+        const double tol_v = std::max(surf->VResolution(t), Precision::PConfusion());
+        Standard_Real u1 = 0.0, u2 = 0.0, v1 = 0.0, v2 = 0.0;
+        BRepTools::UVBounds(face, u1, u2, v1, v2);
+        ext.SetFlag(Extrema_ExtFlag_MINMAX);
+        ext.SetAlgo(Extrema_ExtAlgo_Grad);
+        ext.Initialize(*surf, u1, u2, v1, v2, tol_u, tol_v);
+        ext_ready = true;
+    }
+
+    /// BRepClass_FaceClassifier::Perform(face, uv, tol) with its defaults
+    /// (gap check 0.1, no edge boxes), on the kept explorer.
+    TopAbs_State classify(const gp_Pnt2d& uv) {
+        explorer.SetMaxTolerance(0.1);
+        explorer.SetUseBndBox(Standard_False);
+        classifier.BRepClass_FClassifier::Perform(explorer, uv, tol);
+        return classifier.State();
+    }
+
+    /// DistanceSS::Perform(vertex, face) against reference `dst_ref`.
+    bool solve(const VertexQuery& q, double dst_ref, double& value,
+               std::vector<DistSolution>& seq) {
+        seq.clear();
+        if (q.box.Distance(box) - dst_ref > kDistEps || !ext_ready) {
+            return false;
+        }
+        ext.Perform(q.p);
+        if (!ext.IsDone()) {
+            return false;
+        }
+        // ExtPF keeps IN/ON extrema; DistanceSS then accepts only IN ones.
+        // The classifier input is identical both times, so classify once.
+        struct Kept {
+            double sq;
+            gp_Pnt point;
+            bool inside;
+        };
+        std::vector<Kept> kept;
+        for (int i = 1; i <= ext.NbExt(); ++i) {
+            Standard_Real u = 0.0, v = 0.0;
+            ext.Point(i).Parameter(u, v);
+            const TopAbs_State state = classify(gp_Pnt2d(u, v));
+            if (state == TopAbs_IN || state == TopAbs_ON) {
+                kept.push_back(
+                    {ext.SquareDistance(i), ext.Point(i).Value(), state == TopAbs_IN});
+            }
+        }
+        if (kept.empty()) {
+            return false;
+        }
+        double dmin = kept.front().sq;
+        for (const Kept& k : kept) {
+            dmin = std::min(dmin, k.sq);
+        }
+        dmin = std::sqrt(dmin);
+        if (!(dmin < dst_ref - kDistEps || std::abs(dmin - dst_ref) < kDistEps)) {
+            return false;
+        }
+        value = dst_ref;
+        for (const Kept& k : kept) {
+            if (std::abs(dmin - std::sqrt(k.sq)) < kDistEps &&
+                new_solution_point(seq, k.point) && k.inside) {
+                value = std::min(value, dmin);
+                seq.push_back({dmin, k.point, face});
+            }
+        }
+        return !seq.empty();
+    }
+};
+
+/// Shape 2 of a vertex-to-shape solve: its vertex map, its edge map (as probes
+/// shared across the index) and at most one face.
+struct Shape2Probe {
+    std::vector<gp_Pnt> vertex_points;
+    std::vector<TopoDS_Vertex> vertices;
+    std::vector<EdgeProbe*> edges;
+    FaceProbe* face = nullptr;
+};
+
+/// BRepExtrema_DistShapeShape(vertex, shape 2).Perform(): Value() and the
+/// first shape-2 solution. `n_threads` is the default pool size the solver
+/// sizes its (sequentially executed) task bands by.
+bool distance_to_shape(const VertexQuery& q, const Shape2Probe& s, int n_threads,
+                       double& value, DistSolution& first) {
+    DistState g;
+    g.ref = s.vertices.empty() ? 1.e30 : q.p.Distance(s.vertex_points.front());
+
+    // DistanceVertVert: shape 1 has one vertex, so band 0 does all the work
+    // and the other n_threads - 1 bands are empty.
+    {
+        const double start = g.ref;
+        DistState band{start, {}};
+        for (std::size_t i = 0; i < s.vertices.size(); ++i) {
+            const double d = q.p.Distance(s.vertex_points[i]);
+            band.merge(d, {DistSolution{d, s.vertex_points[i], s.vertices[i]}});
+        }
+        g.merge(band.ref, band.sols, /*take_ref=*/true);
+        for (int t = 1; t < n_threads; ++t) {
+            g.merge(start, {}, /*take_ref=*/true);
+        }
+    }
+
+    // DistanceMapMap over (vertex, edges) then (vertex, face): pairs within
+    // eps of the box test, stable-sorted by box distance, dealt round-robin
+    // to min(pairs, threads) tasks that each start from the same reference.
+    struct Pair {
+        double box_dist;
+        EdgeProbe* edge;
+        FaceProbe* face;
+    };
+    std::vector<Pair> pairs;
+    std::vector<DistSolution> seq;
+    const auto map_map = [&]() {
+        if (pairs.empty()) {
+            return;
+        }
+        std::stable_sort(pairs.begin(), pairs.end(),
+                         [](const Pair& a, const Pair& b) { return a.box_dist < b.box_dist; });
+        const std::size_t n_tasks =
+            std::min(pairs.size(), static_cast<std::size_t>(std::max(1, n_threads)));
+        const double start = g.ref;
+        std::vector<DistState> tasks(n_tasks, DistState{start, {}});
+        for (std::size_t t = 0; t < n_tasks; ++t) {
+            DistState& task = tasks[t];
+            for (std::size_t i = t; i < pairs.size(); i += n_tasks) {
+                if (pairs[i].box_dist > task.ref + kDistEps) {
+                    break;
+                }
+                double v = 0.0;
+                const bool done = pairs[i].edge != nullptr
+                                      ? pairs[i].edge->solve(q, task.ref, v, seq)
+                                      : pairs[i].face->solve(q, task.ref, v, seq);
+                if (done) {
+                    task.merge(v, seq);
+                }
+            }
+        }
+        for (const DistState& task : tasks) {
+            g.merge(task.ref, task.sols);
+        }
+    };
+    const auto keep_pair = [&](const Bnd_Box& box) {
+        return !q.box.IsVoid() && !box.IsVoid() && q.box.Distance(box) - g.ref < kDistEps;
+    };
+    for (EdgeProbe* e : s.edges) {
+        if (keep_pair(e->box)) {
+            pairs.push_back({q.box.Distance(e->box), e, nullptr});
+        }
+    }
+    map_map();
+    pairs.clear();
+    if (s.face != nullptr && keep_pair(s.face->box)) {
+        pairs.push_back({q.box.Distance(s.face->box), nullptr, s.face});
+    }
+    map_map();
+
+    // The solver's final sweep, including its skip after each removal.
+    for (std::size_t i = 0; i < g.sols.size(); ++i) {
+        if (g.sols[i].dist > g.ref + kDistEps) {
+            g.sols.erase(g.sols.begin() + static_cast<std::ptrdiff_t>(i));
+        }
+    }
+    if (g.sols.empty()) {
+        return false;
+    }
+    value = g.ref;
+    first = g.sols.front();
+    return true;
+}
+
 /// Uniform grid hash over BRep face AABBs, same layout as the triangle grid in
 /// mesh/surface_project.cpp (origin / cell / nx,ny,nz plus per-cell bins of
 /// member ids). Faces whose box cannot beat the running best are never solved,
-/// and each face keeps a persistent extrema solver with the face pre-loaded as
-/// shape 2 so OCC's cached decomposition is reused across queries.
+/// and each face or edge keeps a lazily built Shape2Probe so its extrema setup
+/// and classifier are reused across queries.
 struct BrepFaceIndex {
     static constexpr std::size_t kNoFace = static_cast<std::size_t>(-1);
 
@@ -134,8 +535,14 @@ struct BrepFaceIndex {
     std::vector<FaceBox> boxes;
     std::vector<Handle(Geom_Surface)> surfaces;
     std::vector<Handle(BRepAdaptor_Surface)> adaptors;
-    /// One solver per face; `unique_ptr` keeps the cached OCC maps put.
-    std::vector<std::unique_ptr<BRepExtrema_DistShapeShape>> solvers;
+    /// Lazily built solve caches. Edge probes are indexed by edge-map index
+    /// (slot 0 unused) and shared by both faces of an edge; `unique_ptr`
+    /// keeps the Extrema objects, which point into their adaptors, in place.
+    mutable std::vector<std::unique_ptr<EdgeProbe>> edge_probes;
+    mutable std::vector<std::unique_ptr<FaceProbe>> face_probes;
+    mutable std::vector<std::unique_ptr<Shape2Probe>> face_shapes;
+    mutable std::vector<std::unique_ptr<Shape2Probe>> edge_shapes; ///< by CadEdge id
+    int n_threads = 1;
     /// One surface projector per face, initialised on first use. Constructing a
     /// GeomAPI_ProjectPointOnSurf per query re-samples the surface's whole
     /// extrema grid; Init once + Perform per query reuses it with identical
@@ -165,7 +572,10 @@ struct BrepFaceIndex {
         boxes.clear();
         surfaces.clear();
         adaptors.clear();
-        solvers.clear();
+        edge_probes.clear();
+        face_probes.clear();
+        face_shapes.clear();
+        edge_shapes.clear();
         projectors.clear();
         unbounded.clear();
         bins.clear();
@@ -193,6 +603,9 @@ struct BrepFaceIndex {
         for (Standard_Integer i = 1; i <= vertex_map.Extent(); ++i) {
             vertices.push_back(TopoDS::Vertex(vertex_map(i)));
         }
+        edge_probes.resize(static_cast<std::size_t>(edge_map.Extent() + 1));
+        edge_shapes.resize(edges.size());
+        n_threads = OSD_ThreadPool::DefaultPool()->NbThreads();
         const std::size_t nf = faces.size();
         if (nf == 0) {
             return;
@@ -200,7 +613,8 @@ struct BrepFaceIndex {
         boxes.resize(nf);
         surfaces.resize(nf);
         adaptors.resize(nf);
-        solvers.resize(nf);
+        face_probes.resize(nf);
+        face_shapes.resize(nf);
         projectors.resize(nf);
         seen.assign(nf, 0);
 
@@ -224,8 +638,6 @@ struct BrepFaceIndex {
             }
             surfaces[f] = BRep_Tool::Surface(faces[f]);
             adaptors[f] = new BRepAdaptor_Surface(faces[f], Standard_True);
-            solvers[f] = std::make_unique<BRepExtrema_DistShapeShape>();
-            solvers[f]->LoadS2(faces[f]);
         }
         if (!(gmin.array() <= gmax.array()).all()) {
             return; // every face unbounded: cull-free scans only
@@ -294,25 +706,85 @@ struct BrepFaceIndex {
         return normal_at_projection(*proj, *adaptors[f], faces[f].Orientation(), n_out);
     }
 
-    /// Closest point on one trimmed face via the face's persistent extrema
-    /// solver. Failure is reported instead of falling back to the untrimmed
-    /// underlying surface.
-    bool project_on_face(std::size_t f, const TopoDS_Vertex& vtx, gp_Pnt& closest,
-                         double& dist, TopoDS_Shape* support = nullptr) const {
-        if (f >= solvers.size()) {
+    EdgeProbe* edge_probe(const TopoDS_Edge& edge) const {
+        const Standard_Integer i = edge_map.FindIndex(edge);
+        if (i <= 0) { // not a sub-shape of the indexed shape: give it its own slot
+            edge_probes.push_back(std::make_unique<EdgeProbe>(edge));
+            return edge_probes.back().get();
+        }
+        std::unique_ptr<EdgeProbe>& slot = edge_probes[static_cast<std::size_t>(i)];
+        if (!slot) {
+            slot = std::make_unique<EdgeProbe>(edge);
+        }
+        return slot.get();
+    }
+
+    /// Vertex and edge maps of `shape` in TopExp::MapShapes order, as
+    /// BRepExtrema_DistShapeShape::LoadS2 decomposes it.
+    void decompose(const TopoDS_Shape& shape, Shape2Probe& s) const {
+        TopTools_IndexedMapOfShape vmap;
+        TopTools_IndexedMapOfShape emap;
+        TopExp::MapShapes(shape, TopAbs_VERTEX, vmap);
+        TopExp::MapShapes(shape, TopAbs_EDGE, emap);
+        for (Standard_Integer i = 1; i <= vmap.Extent(); ++i) {
+            s.vertices.push_back(TopoDS::Vertex(vmap(i)));
+            s.vertex_points.push_back(BRep_Tool::Pnt(s.vertices.back()));
+        }
+        for (Standard_Integer i = 1; i <= emap.Extent(); ++i) {
+            s.edges.push_back(edge_probe(TopoDS::Edge(emap(i))));
+        }
+    }
+
+    const Shape2Probe& face_shape(std::size_t f) const {
+        std::unique_ptr<Shape2Probe>& slot = face_shapes[f];
+        if (!slot) {
+            slot = std::make_unique<Shape2Probe>();
+            decompose(faces[f], *slot);
+            face_probes[f] = std::make_unique<FaceProbe>(faces[f]);
+            slot->face = face_probes[f].get();
+        }
+        return *slot;
+    }
+
+    const Shape2Probe& edge_shape(std::size_t e) const {
+        std::unique_ptr<Shape2Probe>& slot = edge_shapes[e];
+        if (!slot) {
+            slot = std::make_unique<Shape2Probe>();
+            decompose(edges[e], *slot);
+        }
+        return *slot;
+    }
+
+    /// Closest point on one trimmed face, exactly as a vertex-to-face
+    /// BRepExtrema_DistShapeShape reports it. Failure is reported instead of
+    /// falling back to the untrimmed underlying surface.
+    bool project_on_face(std::size_t f, const VertexQuery& q, gp_Pnt& closest, double& dist,
+                         TopoDS_Shape* support = nullptr) const {
+        if (f >= faces.size()) {
             return false;
         }
-        BRepExtrema_DistShapeShape& dss = *solvers[f];
-        dss.LoadS1(vtx);
-        dss.Perform();
-        if (!dss.IsDone() || dss.NbSolution() < 1) {
+        DistSolution first;
+        if (!distance_to_shape(q, face_shape(f), n_threads, dist, first)) {
             return false;
         }
-        dist = static_cast<double>(dss.Value());
-        closest = dss.PointOnShape2(1);
+        closest = first.point;
         if (support != nullptr) {
-            *support = dss.SupportOnShape2(1);
+            *support = first.support;
         }
+        return std::isfinite(dist);
+    }
+
+    /// Closest point on one edge, as a vertex-to-edge solve reports it.
+    bool project_on_edge(std::size_t e, const VertexQuery& q, gp_Pnt& closest,
+                         double& dist) const {
+        if (e >= edges.size()) {
+            return false;
+        }
+        DistSolution first;
+        if (!distance_to_shape(q, edge_shape(e), n_threads, dist, first)) {
+            return false;
+        }
+        closest = first.point;
         return std::isfinite(dist);
     }
 
@@ -341,17 +813,18 @@ struct BrepFaceIndex {
         return {CadSupportKind::kUnknown, kInvalidCadSupportId};
     }
 
-    /// Exact closest face for `p`: the grid is walked outward and boxed-out
-    /// faces are skipped. With no grid (every face unbounded) every face is
-    /// solved. The winner is order-independent, so both paths agree bit for bit.
-    Winner closest(const TopoDS_Vertex& vtx, const Eigen::Vector3d& p) const {
+    /// Exact closest face for `p`: the grid is walked outward, each shell's
+    /// faces are solved nearest-box first, and boxed-out faces are skipped.
+    /// With no grid (every face unbounded) every face is solved. The winner is
+    /// order-independent, so every path agrees bit for bit.
+    Winner closest(const VertexQuery& vq, const Eigen::Vector3d& p) const {
         Winner w;
 
         const auto consider = [&](std::size_t f) {
             gp_Pnt q;
             double d = 0.0;
             TopoDS_Shape support;
-            if (!project_on_face(f, vtx, q, d, &support)) {
+            if (!project_on_face(f, vq, q, d, &support)) {
                 return;
             }
             if (d < w.dist || (d == w.dist && f < w.face)) {
@@ -382,6 +855,7 @@ struct BrepFaceIndex {
         const int jc = std::clamp(static_cast<int>(std::floor(local[1])), 0, ny - 1);
         const int kc = std::clamp(static_cast<int>(std::floor(local[2])), 0, nz - 1);
         const int max_r = std::max({nx, ny, nz});
+        std::vector<std::pair<double, std::uint32_t>> shell; // (box lower bound, face)
 
         for (int r = 0; r <= max_r; ++r) {
             // Any point of an unvisited cell at shell radius r is at least
@@ -393,6 +867,7 @@ struct BrepFaceIndex {
             const int i0 = std::max(0, ic - r), i1 = std::min(nx - 1, ic + r);
             const int j0 = std::max(0, jc - r), j1 = std::min(ny - 1, jc + r);
             const int k0 = std::max(0, kc - r), k1 = std::min(nz - 1, kc + r);
+            shell.clear();
             for (int k = k0; k <= k1; ++k) {
                 for (int j = j0; j <= j1; ++j) {
                     for (int i = i0; i <= i1; ++i) {
@@ -406,14 +881,22 @@ struct BrepFaceIndex {
                                 continue;
                             }
                             seen[f] = epoch;
+                            const double lb = box_lower_bound(p, boxes[f]);
                             // `w.dist` only shrinks, so a boxed-out face stays out.
-                            if (box_lower_bound(p, boxes[f]) > w.dist) {
-                                continue;
+                            if (lb <= w.dist) {
+                                shell.emplace_back(lb, f);
                             }
-                            consider(f);
                         }
                     }
                 }
+            }
+            // Nearest box first lets the first exact solve cull the rest.
+            std::sort(shell.begin(), shell.end());
+            for (const auto& [lb, f] : shell) {
+                if (lb > w.dist) {
+                    break;
+                }
+                consider(f);
             }
         }
         return w;
@@ -493,9 +976,7 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
     const auto* shape = static_cast<const TopoDS_Shape*>(model.shape_handle());
     const BrepFaceIndex& index = face_index_for(model, *shape);
 
-    BRep_Builder builder;
-    TopoDS_Vertex vtx;
-    builder.MakeVertex(vtx, gp_Pnt(p.x(), p.y(), p.z()), Precision::Confusion());
+    const VertexQuery q = make_vertex_query(p);
 
     double best_dist = std::numeric_limits<double>::infinity();
     gp_Pnt best_pt;
@@ -511,7 +992,7 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
             double dist = 0.0;
             gp_Vec n(0, 0, 0);
             TopoDS_Shape support;
-            if (!project_on_face_brute(vtx, index.faces[f], closest, dist, n, support)) {
+            if (!project_on_face_brute(q.vtx, index.faces[f], closest, dist, n, support)) {
                 continue;
             }
             if (dist < best_dist) {
@@ -524,7 +1005,7 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
             }
         }
     } else {
-        const BrepFaceIndex::Winner win = index.closest(vtx, p);
+        const BrepFaceIndex::Winner win = index.closest(q, p);
         if (win.face != BrepFaceIndex::kNoFace) {
             best_dist = win.dist;
             best_pt = win.point;
@@ -540,7 +1021,7 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
     // Whole-shape fallback if the face map is empty or every trimmed solve
     // failed. It is still exact, but cannot always name an owning face.
     if (!found) {
-        BRepExtrema_DistShapeShape dss(vtx, *shape);
+        BRepExtrema_DistShapeShape dss(q.vtx, *shape);
         dss.Perform();
         if (!dss.IsDone() || dss.NbSolution() < 1) {
             return std::nullopt;
@@ -575,12 +1056,10 @@ project_point_on_face(const CadModel& model, std::uint32_t face_id, const Eigen:
     if (face_id >= index.faces.size()) {
         return std::nullopt;
     }
-    BRep_Builder builder;
-    TopoDS_Vertex vtx;
-    builder.MakeVertex(vtx, gp_Pnt(p.x(), p.y(), p.z()), Precision::Confusion());
+    const VertexQuery q = make_vertex_query(p);
     gp_Pnt closest;
     double distance = 0.0;
-    if (!index.project_on_face(face_id, vtx, closest, distance)) {
+    if (!index.project_on_face(face_id, q, closest, distance)) {
         return std::nullopt;
     }
     gp_Vec normal(0, 0, 0);
@@ -599,18 +1078,24 @@ project_point_on_edge(const CadModel& model, std::uint32_t edge_id, const Eigen:
     if (edge_id >= index.edges.size()) {
         return std::nullopt;
     }
-    BRep_Builder builder;
-    TopoDS_Vertex vtx;
-    builder.MakeVertex(vtx, gp_Pnt(p.x(), p.y(), p.z()), Precision::Confusion());
-    BRepExtrema_DistShapeShape dss(vtx, index.edges[edge_id]);
-    dss.Perform();
-    if (!dss.IsDone() || dss.NbSolution() < 1 ||
-        !std::isfinite(static_cast<double>(dss.Value()))) {
+    const VertexQuery q = make_vertex_query(p);
+    gp_Pnt closest;
+    double distance = 0.0;
+    if (proj_brute_enabled()) {
+        BRepExtrema_DistShapeShape dss(q.vtx, index.edges[edge_id]);
+        if (!dss.IsDone() || dss.NbSolution() < 1) {
+            return std::nullopt;
+        }
+        closest = dss.PointOnShape2(1);
+        distance = static_cast<double>(dss.Value());
+    } else if (!index.project_on_edge(edge_id, q, closest, distance)) {
         return std::nullopt;
     }
-    return make_project_result(p, dss.PointOnShape2(1), static_cast<double>(dss.Value()),
-                               gp_Vec(0, 0, 0), CadSupportKind::kEdge, edge_id,
-                               kInvalidCadSupportId);
+    if (!std::isfinite(distance)) {
+        return std::nullopt;
+    }
+    return make_project_result(p, closest, distance, gp_Vec(0, 0, 0), CadSupportKind::kEdge,
+                               edge_id, kInvalidCadSupportId);
 }
 
 std::optional<ProjectResult> project_point_on_vertex(const CadModel& model,

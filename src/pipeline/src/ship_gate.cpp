@@ -751,22 +751,58 @@ ExteriorConformStats conform_true_exterior(
                 }
                 std::sort(affected.begin(), affected.end());
                 affected.erase(std::unique(affected.begin(), affected.end()), affected.end());
+                // Per-cell objective term, cached across the pattern search: a trial
+                // moves one candidate, so only that candidate's incident cells change
+                // and only those are re-measured. `affected` is sorted, so a cell's
+                // slot is found by binary search once per candidate.
+                std::vector<double> term(affected.size());
+                std::vector<char> term_fresh(affected.size(), 0);
+                const auto cell_term = [&](std::size_t slot) {
+                    if (term_fresh[slot] == 0) {
+                        const auto& element = mesh.elements[affected[slot]];
+                        double quality = fea::cell_quality(mesh, element);
+                        if (!std::isfinite(quality)) {
+                            quality = -std::numeric_limits<double>::infinity();
+                        } else {
+                            // A finite tet4 quality already carries its Jacobian's
+                            // sign (both are the signed volume's), so the
+                            // integrability test can only flip a non-positive value
+                            // to itself.
+                            const bool linear_tet = element.type == fea::ElementType::kTet4 &&
+                                                    element.nodes.size() == 4;
+                            if (!linear_tet &&
+                                !fea::element_jacobians_positive(mesh, element)) {
+                                quality = -std::abs(quality);
+                            }
+                        }
+                        term[slot] = quality;
+                        term_fresh[slot] = 1;
+                    }
+                    return term[slot];
+                };
+                std::vector<std::vector<std::size_t>> candidate_slots(candidates.size());
+                for (std::size_t ci = 0; ci < candidates.size(); ++ci) {
+                    for (const auto ei : incident[candidates[ci]]) {
+                        candidate_slots[ci].push_back(static_cast<std::size_t>(
+                            std::lower_bound(affected.begin(), affected.end(), ei) -
+                            affected.begin()));
+                    }
+                }
+                const auto place = [&](std::size_t ci, const Eigen::Vector3d& position) {
+                    mesh.nodes[candidates[ci]] = position;
+                    for (const auto slot : candidate_slots[ci]) {
+                        term_fresh[slot] = 0;
+                    }
+                };
                 // Branch-and-bound worst-quality: a candidate move can only be
                 // accepted if it beats `bound`, so stop the scan the moment a cell
                 // is at or below it. This keeps a per-edge pattern search
-                // affordable on a full boundary.
+                // affordable on a full boundary. A non-finite cell reads -inf,
+                // which stops the scan at once.
                 const auto objective = [&](double bound) {
                     double worst = std::numeric_limits<double>::infinity();
-                    for (const auto ei : affected) {
-                        const auto& element = mesh.elements[ei];
-                        double quality = fea::cell_quality(mesh, element);
-                        if (!std::isfinite(quality)) {
-                            return -std::numeric_limits<double>::infinity();
-                        }
-                        if (!fea::element_jacobians_positive(mesh, element)) {
-                            quality = -std::abs(quality);
-                        }
-                        worst = std::min(worst, quality);
+                    for (std::size_t slot = 0; slot < affected.size(); ++slot) {
+                        worst = std::min(worst, cell_term(slot));
                         if (worst <= bound) {
                             return worst;
                         }
@@ -808,14 +844,14 @@ ExteriorConformStats conform_true_exterior(
                                             trial = mirror->clamp_to_planes(trial,
                                                                             mesh.nodes[node]);
                                         }
-                                        mesh.nodes[node] = trial;
+                                        place(ci, trial);
                                         const double quality = objective(best_quality);
                                         if (quality > best_quality + 1e-14) {
                                             best_quality = quality;
                                             best_position = trial;
                                             changed = true;
                                         }
-                                        mesh.nodes[node] = best_position;
+                                        place(ci, best_position);
                                     }
                                 }
                             }

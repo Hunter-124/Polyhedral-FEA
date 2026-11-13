@@ -4,6 +4,12 @@ Short summary of the most recent period. Current status and open work:
 [`STATUS.md`](STATUS.md). Full dated chronology through `85f2b16`:
 [`archive/progress-history.md`](archive/progress-history.md).
 
+## 2026-11
+
+| Date | Change | Evidence |
+|---|---|---|
+| 11-13 | **Graded meshing 1.4–5.2× faster, bit-identical output.** `cad_projection.cpp` replays `BRepExtrema_DistShapeShape(vertex, face\|edge)` on cached per-face/per-edge probes (same sub-shape maps, Extrema setup, box pruning and eps/tie order, exact `BRepClass` classifier on a kept explorer; planar faces classify against a private copy that stores the pcurves `CurveOnPlane` would rebuild per call), and each grid shell solves the nearest boxes first. The exterior edge pass caches each cell's objective term across the pattern search's one-node trial moves, and `max_edge_squared` no longer calls the out-of-line `std::max({...})`. Graded beam 200×20×20 mm (CAD's `fea_profile` part) h = 8 / 6 / 5 mm: 10.7 / 25.0 / 29.8 s → 2.6 / 6.6 / 6.5 s; `plate_hole` 21.2 → 4.1 s, `two_hole_plate` 30.7 → 5.9 s, `cantilever` 7.3 → 1.6 s, `cylinder` 13.5 → 6.4 s, `wishbone` 207 → 121 s (h = bbox/20, MSVC, loaded host, old and new back to back). | Fill and final tet10 meshes hash-identical on all 10 runs; `project_point_on_surface/face/edge` identical on 90,000 queries over 10 fixtures, also against the `POLYMESH_PROJ_BRUTE` oracle. |
+
 ## 2026-10
 
 | Date | Change | Evidence |

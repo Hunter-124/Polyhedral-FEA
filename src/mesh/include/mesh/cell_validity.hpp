@@ -40,10 +40,20 @@ inline double max_edge(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
 
 /// The same longest edge, SQUARED — one square root instead of six wherever the
 /// caller is going to raise it to an even power or cube it anyway.
+/// Written as std::max_element's own scan (keep the first value nothing later
+/// beats) because std::max({...}) over six doubles compiles to an out-of-line
+/// vectorised call, a hot spot in the conformity gates' inner loops.
 inline double max_edge_squared(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                                const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    return std::max({(a - b).squaredNorm(), (a - c).squaredNorm(), (a - d).squaredNorm(),
-                     (b - c).squaredNorm(), (b - d).squaredNorm(), (c - d).squaredNorm()});
+    const double e[6] = {(a - b).squaredNorm(), (a - c).squaredNorm(), (a - d).squaredNorm(),
+                         (b - c).squaredNorm(), (b - d).squaredNorm(), (c - d).squaredNorm()};
+    double m = e[0];
+    for (int i = 1; i < 6; ++i) {
+        if (m < e[i]) {
+            m = e[i];
+        }
+    }
+    return m;
 }
 
 /// 6·√2·V / L_max³ — 1.0 for a regular tet, 0 for a flat one, negative when

@@ -1,0 +1,155 @@
+{
+  "what": "closed-form refit of the untrained dof / mesh_ms / solve_ms heads of the portable-cost graph (docs/advisor/0014)",
+  "tool": "scripts/advisor/refit_cost_heads.py",
+  "base_graph_sha256": "03b4062c8c2bd618399068a72f93099974ca5834c6993db347af2485071401bd",
+  "refit_graph_sha256": "e70f661266ebbd334dc96572499b52eafa1af5f41adf0a7e3c83b7a844582211",
+  "dataset_note": "rebuilt with scripts/build_advisor_dataset.py from the regenerated procedural corpus (scripts/gen_primitive_corpus.py under cadquery-ocp 7.8.1); 35,060 rows vs the 36,010 of the shipped cycle, normalization.json reproduces from its fold-0 train split to < 0.07 std",
+  "refit": {
+    "model": "model.onnx",
+    "dataset_csv": "dataset.csv",
+    "dataset_rows": 35060,
+    "dataset_sha256": "e004da9d2cb3a0ddc2e417d864af2010da285292ba78a0b1a869d6d401ef196b",
+    "split": "family",
+    "fold": 0,
+    "held_out_groups": [
+      "bossed_plate"
+    ],
+    "heads": {
+      "dof": {
+        "kind": "huber_ridge",
+        "lambda": 0.1,
+        "train_rows": 17836,
+        "clip": null,
+        "parity_max_abs": 2.4181955815549827e-06,
+        "held_out_before": {
+          "n": 1930,
+          "mae": 3.0101152959998716,
+          "rmse": 3.089017530121309,
+          "bias": -3.0101152959998716
+        },
+        "held_out_after": {
+          "n": 1930,
+          "mae": 0.23030101202930192,
+          "rmse": 0.29368185128230834,
+          "bias": -0.11243525762014439
+        }
+      },
+      "mesh_ms": {
+        "kind": "ridge",
+        "lambda": 0.03162277660168379,
+        "train_rows": 17836,
+        "clip": [
+          1.1254394054412842,
+          5.415797233581543
+        ],
+        "parity_max_abs": 1.4467086844049959e-06,
+        "held_out_before": {
+          "n": 1930,
+          "mae": 2.515188313959832,
+          "rmse": 2.5701245218906794,
+          "bias": -2.515188313959832
+        },
+        "held_out_after": {
+          "n": 1930,
+          "mae": 0.26402728940538794,
+          "rmse": 0.3244629385059471,
+          "bias": 0.16488765459604213
+        }
+      },
+      "solve_ms": {
+        "kind": "huber_ridge",
+        "lambda": 0.1,
+        "train_rows": 17836,
+        "clip": [
+          -3.0,
+          5.0746684074401855
+        ],
+        "parity_max_abs": 2.806262116461511e-06,
+        "held_out_before": {
+          "n": 1930,
+          "mae": 2.4362457937228017,
+          "rmse": 2.5252228372362127,
+          "bias": -1.4684074003703005
+        },
+        "held_out_after": {
+          "n": 1930,
+          "mae": 1.0855039152823427,
+          "rmse": 1.4951434802731707,
+          "bias": 0.02438138128002536
+        }
+      }
+    }
+  },
+  "unchanged_outputs": [
+    "rel_err",
+    "rel_err_rel",
+    "geo_chamfer",
+    "geo_p99",
+    "solve_flops",
+    "solve_bytes",
+    "mesh_work",
+    "failure_logit",
+    "policy",
+    "trunk_input",
+    "trunk_fc1",
+    "trunk_fc2"
+  ],
+  "unchanged_outputs_check": "np.array_equal on all 35,060 rows, asserted by the tool",
+  "leave_one_family_out": {
+    "protocol": "21 leave-one-family-out folds x 2 seeds (1234, 1235) = 42 trunks retrained with the repo's train_one_run, the shipped Stage-A/Stage-B weights (dof/mesh_ms/solve_ms at 0.0, as in production) and the outlier-pruning ledger, on a short warm-started schedule rather than the production 150 runs; each head refitted on the fold's 20 training families and scored on the held-out one. W-L counts folds where the refit beats the untrained head (log10 units)",
+    "dof": {
+      "variant": "huber_ridge",
+      "rmse_macro_before": 2.8218,
+      "rmse_macro_after": 0.4921,
+      "mae_before": 2.724,
+      "mae_after": 0.414,
+      "rmse_w_l": "42-0",
+      "mae_w_l": "42-0"
+    },
+    "mesh_ms": {
+      "variant": "ridge + clip",
+      "rmse_macro_before": 3.6204,
+      "rmse_macro_after": 0.6526,
+      "mae_before": 3.543,
+      "mae_after": 0.571,
+      "rmse_w_l": "42-0",
+      "mae_w_l": "41-1"
+    },
+    "solve_ms": {
+      "variant": "huber_ridge (clip not separately scored)",
+      "rmse_macro_before": 2.2907,
+      "rmse_macro_after": 1.8643,
+      "mae_before": 1.958,
+      "mae_after": 1.387,
+      "rmse_w_l": "34-8",
+      "mae_w_l": "37-5"
+    },
+    "not_edited": "rel_err, rel_err_rel, geo_chamfer, geo_p99 and failure refits were within noise or carried by one family; mesh_work, solve_flops and solve_bytes are trained heads that drive --advisor-objective efficiency and are left untouched"
+  },
+  "max_dof_filter_cpp": {
+    "harness": "polymesh::advisor::Advisor (C++, ONNX Runtime 1.28.0 CPU) over the 1,930 dof-supervised bossed_plate rows (20 cases); budget = each case's median measured DOF; agreement = per row, predicted-affordable == measured-affordable, averaged per case; chooser = Advisor::explain / recommend on the 108-action candidate grid with the part's exact-BRep descriptors",
+    "base_graph": {
+      "affordability_agreement": 0.5258,
+      "kept_fraction": 1.0,
+      "candidates_pruned": 0,
+      "candidates_ranked": 2160,
+      "cases_with_pruning": 0,
+      "cases": 20,
+      "decisions_changed_by_budget": 0,
+      "budget_refusals": 0,
+      "max_abs_dof_log10_cpp_vs_ort": 0.0
+    },
+    "refit_graph": {
+      "affordability_agreement": 0.8063,
+      "kept_fraction": 0.6575,
+      "candidates_pruned": 281,
+      "candidates_ranked": 2160,
+      "cases_with_pruning": 20,
+      "cases": 20,
+      "decisions_changed_by_budget": 10,
+      "budget_refusals": 0,
+      "max_abs_dof_log10_cpp_vs_ort": 0.0
+    },
+    "unbudgeted_decisions_identical": "20/20"
+  }
+}

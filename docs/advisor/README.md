@@ -12,6 +12,9 @@ next work live in [docs/STATUS.md](../STATUS.md); training-host setup in
 36,010-row dataset over 15 procedural families; 75 inputs; 19,156 parameters;
 twelve contract outputs plus three activation taps. Default objective is
 accuracy; `--advisor-objective efficiency` uses an optional host calibration.
+The untrained `dof` / `mesh_ms` / `solve_ms` heads are refitted in closed form
+on the shipped trunk ([0014](0014-cost-head-refit.md)), so `--advisor-max-dof`
+binds; every other output is bit-identical to run 144.
 
 Shipped artifacts in `bench/advisor/` (loaded by `polymesh solve --advisor
 bench/advisor` and `polymesh_testlab --advisor`):
@@ -31,6 +34,7 @@ Evidence for the same cycle:
 | `calibration.json` | feasibility calibration, conformal and OOD rates (36,010 rows) |
 | `weights.json` | per-head loss weights, Stage A/B schedule |
 | `hosts/hunter-pc.json` | committed host calibration (FLOP/s, byte/s, reference mesh) |
+| `evidence/cost_head_refit.json` | 0014 cost-head refit: fits, held-out and LOFO metrics, C++ `max_dof` check |
 | `evidence/campaign_coverage.json` | planned vs recorded campaign rows, every omission |
 | `evidence/corpus_evidence.json`, `evidence/geometry_features.csv` | 60-solid descriptor gate |
 | `evidence/architecture_benchmark.json`, `evidence/precision_benchmark.json` | rejected four-branch design; training precision throughput |
@@ -63,6 +67,7 @@ frozen reports 0006–0011.
 | 0011 | [v7 curved-geometry retrain](0011-v7-curved-geometry-retrain.md) | superseded cycle report |
 | 0012 | [Portable-cost retrain](0012-portable-cost-retrain.md) | **current generation** |
 | 0013 | [Solver and meshing survey](0013-solver-and-meshing-survey.md) | methods adopted and deferred for 0012 |
+| 0014 | [Cost-head refit](0014-cost-head-refit.md) | head-only edit of the 0012 graph: `dof` / `mesh_ms` / `solve_ms` |
 
 0006–0011 are a frozen historical series: their bodies are not edited, and their
 "current"/"shipped" wording refers to their own date.

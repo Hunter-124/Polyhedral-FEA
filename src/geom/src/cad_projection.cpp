@@ -7,6 +7,7 @@
 
 #ifdef POLYMESH_WITH_OCC
 
+#include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
@@ -48,6 +49,8 @@
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include "uv_state_grid.hpp"
 
 #endif // POLYMESH_WITH_OCC
 
@@ -324,10 +327,14 @@ struct FaceProbe {
     Extrema_ExtPS ext;
     bool ext_ready = false;
     double tol = 0.0;
+    TopoDS_Face classified; ///< the face the explorer walks
     BRepClass_FaceExplorer explorer;
     BRepClass_FaceClassifier classifier;
+    detail::UvStateGrid grid;
+    int n_classified = 0;
 
-    explicit FaceProbe(const TopoDS_Face& f) : face(f), explorer(classifier_face(f)) {
+    explicit FaceProbe(const TopoDS_Face& f)
+        : face(f), classified(classifier_face(f)), explorer(classified) {
         BRepBndLib::Add(face, box);
         tol = BRep_Tool::Tolerance(face);
         // BRepExtrema_ExtPF::Initialize, flag MINMAX and algo Grad being
@@ -349,12 +356,24 @@ struct FaceProbe {
 
     /// BRepClass_FaceClassifier::Perform(face, uv, tol) with its defaults
     /// (gap check 0.1, no edge boxes), on the kept explorer.
-    TopAbs_State classify(const gp_Pnt2d& uv) {
+    TopAbs_State classify_exact(const gp_Pnt2d& uv) {
         explorer.SetMaxTolerance(0.1);
         explorer.SetUseBndBox(Standard_False);
         classifier.BRepClass_FClassifier::Perform(explorer, uv, tol);
         return classifier.State();
     }
+
+    /// classify_exact, answered from the UV state grid away from the
+    /// boundary (see UvStateGrid). The grid is built once the face has been
+    /// classified a few times, so faces queried rarely never pay for it.
+    TopAbs_State classify(const gp_Pnt2d& uv) {
+        if (n_classified < kGridAfter && ++n_classified == kGridAfter) {
+            grid.build(classified, tol);
+        }
+        return grid.classify(uv.X(), uv.Y(),
+                             [&](const gp_Pnt2d& p) { return classify_exact(p); });
+    }
+    static constexpr int kGridAfter = 8;
 
     /// DistanceSS::Perform(vertex, face) against reference `dst_ref`.
     bool solve(const VertexQuery& q, double dst_ref, double& value,
@@ -577,6 +596,8 @@ struct BrepFaceIndex {
         face_shapes.clear();
         edge_shapes.clear();
         projectors.clear();
+        edge_boxes.clear();
+        edge_box_valid.clear();
         unbounded.clear();
         bins.clear();
         seen.clear();
@@ -772,6 +793,70 @@ struct BrepFaceIndex {
             *support = first.support;
         }
         return std::isfinite(dist);
+    }
+
+    /// Conservative boxes of `edges`, built on first use: each holds the exact
+    /// 3D curve (BndLib bounds a conic exactly and a Bezier/BSpline by its
+    /// poles) enlarged by the edge tolerance, plus the edge's vertices
+    /// enlarged by theirs, so every point a vertex-to-edge solve can return is
+    /// inside. An edge whose curve BndLib only samples gets no box.
+    mutable std::vector<FaceBox> edge_boxes;
+    mutable std::vector<char> edge_box_valid;
+
+    double edge_lower_bound(std::size_t e, const Eigen::Vector3d& p) const {
+        if (e >= edges.size()) {
+            return 0.0;
+        }
+        if (edge_boxes.size() != edges.size()) {
+            edge_boxes.assign(edges.size(), FaceBox{});
+            edge_box_valid.assign(edges.size(), 0);
+            for (std::size_t i = 0; i < edges.size(); ++i) {
+                try {
+                    if (!BRep_Tool::IsGeometric(edges[i])) {
+                        continue;
+                    }
+                    const BRepAdaptor_Curve curve(edges[i]);
+                    switch (curve.GetType()) {
+                    case GeomAbs_Line:
+                    case GeomAbs_Circle:
+                    case GeomAbs_Ellipse:
+                    case GeomAbs_Hyperbola:
+                    case GeomAbs_Parabola:
+                    case GeomAbs_BezierCurve:
+                    case GeomAbs_BSplineCurve:
+                        break;
+                    default:
+                        continue;
+                    }
+                    Bnd_Box box;
+                    BRepBndLib::Add(edges[i], box, /*useTriangulation=*/Standard_False);
+                    double vertex_tol = 0.0;
+                    for (TopoDS_Iterator it(edges[i]); it.More(); it.Next()) {
+                        const TopoDS_Vertex& v = TopoDS::Vertex(it.Value());
+                        box.Add(BRep_Tool::Pnt(v));
+                        vertex_tol = std::max(vertex_tol, BRep_Tool::Tolerance(v));
+                    }
+                    if (box.IsVoid() || box.IsOpen()) {
+                        continue;
+                    }
+                    box.Enlarge(vertex_tol);
+                    double x0 = 0.0, y0 = 0.0, z0 = 0.0, x1 = 0.0, y1 = 0.0, z1 = 0.0;
+                    box.Get(x0, y0, z0, x1, y1, z1);
+                    edge_boxes[i].lo = Eigen::Vector3d(x0, y0, z0);
+                    edge_boxes[i].hi = Eigen::Vector3d(x1, y1, z1);
+                    edge_box_valid[i] = 1;
+                } catch (const Standard_Failure&) {
+                    edge_box_valid[i] = 0;
+                }
+            }
+        }
+        if (edge_box_valid[e] == 0) {
+            return 0.0;
+        }
+        const double d = box_lower_bound(p, edge_boxes[e]);
+        // Leave a rounding margin so a solve's own arithmetic can never land
+        // under the bound.
+        return std::isfinite(d) ? std::max(0.0, d * (1.0 - 1e-9) - 1e-12) : 0.0;
     }
 
     /// Closest point on one edge, as a vertex-to-edge solve reports it.
@@ -1098,6 +1183,15 @@ project_point_on_edge(const CadModel& model, std::uint32_t edge_id, const Eigen:
                                edge_id, kInvalidCadSupportId);
 }
 
+double edge_distance_lower_bound(const CadModel& model, std::uint32_t edge_id,
+                                 const Eigen::Vector3d& p) {
+    if (model.empty() || model.shape_handle() == nullptr || proj_brute_enabled()) {
+        return 0.0;
+    }
+    const auto* shape = static_cast<const TopoDS_Shape*>(model.shape_handle());
+    return face_index_for(model, *shape).edge_lower_bound(edge_id, p);
+}
+
 std::optional<ProjectResult> project_point_on_vertex(const CadModel& model,
                                                      std::uint32_t vertex_id,
                                                      const Eigen::Vector3d& p) {
@@ -1133,6 +1227,11 @@ std::optional<ProjectResult> project_point_on_edge(const CadModel& /*model*/,
                                                    std::uint32_t /*edge_id*/,
                                                    const Eigen::Vector3d& /*p*/) {
     return std::nullopt;
+}
+
+double edge_distance_lower_bound(const CadModel& /*model*/, std::uint32_t /*edge_id*/,
+                                 const Eigen::Vector3d& /*p*/) {
+    return 0.0;
 }
 
 std::optional<ProjectResult> project_point_on_vertex(const CadModel& /*model*/,

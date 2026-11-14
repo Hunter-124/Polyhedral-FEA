@@ -256,6 +256,42 @@ ClosestPoint closest_on_surface(const geom::TriSurface& surface, const Eigen::Ve
     return best;
 }
 
+namespace {
+
+/// owned_boundary_projection_target's oracle call and owner rule, on the
+/// owner record `support` (the node's slot, or a scratch copy).
+std::optional<BoundaryTarget> owned_target_with(const Eigen::Vector3d& p,
+                                                const BoundaryProjectionContext& context,
+                                                const MirrorFrame* mirror,
+                                                BoundarySupport& support) {
+    const BoundarySupport owner = support;
+    // The oracle sees the folded query, so ownership is classified in the
+    // canonical octant: a node and its mirror image latch the SAME face/edge/
+    // vertex id and are then projected onto mirrored points of it. Classifying
+    // each in its own octant would let a sphere's seam edge own one node and
+    // its mirror image own the face (ADR-0036 §7).
+    const Eigen::Vector3d query = mirror_fold(mirror, p);
+    auto target = context.target(query, support);
+    fill_progress_poll();
+    // A classified owner is immutable. In particular, vertex and protected
+    // edge ownership can never silently fall back to a face.
+    if (owner.kind != BoundarySupportKind::kUnknown &&
+        (support.kind != owner.kind || support.id != owner.id)) {
+        support = owner;
+        return std::nullopt;
+    }
+    if (target && target->point.allFinite()) {
+        target->point = mirror_unfold(mirror, target->point, p);
+        target->distance = (target->point - p).norm();
+        if (std::isfinite(target->distance)) {
+            return target;
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
 std::optional<BoundaryTarget>
 owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
                                  BoundaryProjectionContext* context,
@@ -271,30 +307,29 @@ owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
         }
         support = &(*context->provenance)[node];
     }
-    const BoundarySupport owner = *support;
-    // The oracle sees the folded query, so ownership is classified in the
-    // canonical octant: a node and its mirror image latch the SAME face/edge/
-    // vertex id and are then projected onto mirrored points of it. Classifying
-    // each in its own octant would let a sphere's seam edge own one node and
-    // its mirror image own the face (ADR-0036 §7).
-    const Eigen::Vector3d query = mirror_fold(mirror, p);
-    auto target = context->target(query, *support);
-    fill_progress_poll();
-    // A classified owner is immutable. In particular, vertex and protected
-    // edge ownership can never silently fall back to a face.
-    if (owner.kind != BoundarySupportKind::kUnknown &&
-        (support->kind != owner.kind || support->id != owner.id)) {
-        *support = owner;
+    return owned_target_with(p, *context, mirror, *support);
+}
+
+std::optional<BoundaryTarget>
+peek_owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
+                                      const BoundaryProjectionContext* context,
+                                      const MirrorFrame* mirror, bool& owner_kept) {
+    owner_kept = false;
+    if (context == nullptr || !context->target) {
         return std::nullopt;
     }
-    if (target && target->point.allFinite()) {
-        target->point = mirror_unfold(mirror, target->point, p);
-        target->distance = (target->point - p).norm();
-        if (std::isfinite(target->distance)) {
-            return target;
-        }
+    BoundarySupport owner;
+    if (context->provenance != nullptr && node < context->provenance->size()) {
+        owner = (*context->provenance)[node];
     }
-    return std::nullopt;
+    BoundarySupport scratch = owner;
+    auto target = owned_target_with(p, *context, mirror, scratch);
+    // A record the real call would create (provenance shorter than `node`)
+    // or rewrite is a side effect this peek cannot stand in for.
+    owner_kept = (context->provenance == nullptr || node < context->provenance->size()) &&
+                 scratch.kind == owner.kind && scratch.id == owner.id &&
+                 owner.kind != BoundarySupportKind::kUnknown;
+    return target;
 }
 
 std::optional<BoundaryTarget> boundary_projection_target(const geom::TriSurface& surface,

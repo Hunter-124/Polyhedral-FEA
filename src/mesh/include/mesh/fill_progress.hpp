@@ -4,6 +4,7 @@
 #include "mesh/hybrid_fill.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <format>
 #include <string_view>
 
@@ -53,7 +54,22 @@ class FillProgressScope {
     void poll(bool force = false) {
         if (!options_.on_progress)
             return;
+        // Fill loops poll per node or per tet, and a clock read per poll cost
+        // more than the work in the tightest of them. Read the clock every
+        // `stride_` polls instead, with the stride adapted so reads land
+        // roughly a millisecond apart.
+        if (!force && ++skipped_ < stride_)
+            return;
+        skipped_ = 0;
         const auto now = std::chrono::steady_clock::now();
+        if (!force) {
+            const auto gap = now - last_read_;
+            last_read_ = now;
+            if (gap < std::chrono::milliseconds(1) && stride_ < kMaxStride)
+                stride_ *= 2;
+            else if (gap > std::chrono::milliseconds(10) && stride_ > 1)
+                stride_ /= 2;
+        }
         // Four seconds leaves room for the next unit of synchronous work.
         if (!force && now - last_ < std::chrono::seconds(4))
             return;
@@ -80,6 +96,10 @@ class FillProgressScope {
     const std::size_t* removed_ = nullptr;
     FillProgress progress_;
     std::chrono::steady_clock::time_point last_{};
+    static constexpr std::uint32_t kMaxStride = 4096;
+    std::chrono::steady_clock::time_point last_read_{};
+    std::uint32_t stride_ = 1;
+    std::uint32_t skipped_ = 0;
 };
 
 /// Temporarily bind the live mesh while a helper owns moved-in vectors. A

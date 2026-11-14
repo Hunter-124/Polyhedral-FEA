@@ -11,7 +11,13 @@
 #include <Eigen/Core>
 
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
+#include <optional>
+#include <random>
+#include <thread>
+#include <utility>
+#include <vector>
 
 using polymesh::geom::CadModel;
 using polymesh::geom::GeomError;
@@ -173,4 +179,66 @@ TEST_CASE("exact constrained projections retain stable cube topology owners") {
         polymesh::geom::project_point_on_vertex(
             model, static_cast<std::uint32_t>(topo.vertices.size()), Eigen::Vector3d::Zero())
             .has_value());
+}
+
+TEST_CASE("cached face classification answers exactly like a cold projection") {
+    if (!occ_enabled()) {
+        SKIP("OpenCASCADE not enabled");
+    }
+    // A thread's face probes answer point-in-face queries from a UV state grid
+    // once a face has been classified a few times. A fresh thread classifies
+    // its first queries with BRepClass alone, so each query run cold on its
+    // own thread is the reference for the same query on a warmed-up thread.
+    for (const char* path :
+         {"tests/fixtures/parts/plate_hole.step", "tests/fixtures/parts/two_hole_plate.step",
+          "tests/fixtures/parts/wishbone.step"}) {
+        if (!std::filesystem::exists(path)) {
+            continue;
+        }
+        const CadModel model = CadModel::load_step(path);
+        const auto topo = polymesh::geom::extract_topology(model, 8);
+        REQUIRE_FALSE(topo.faces.empty());
+        const Eigen::Vector3d lo = model.bbox_min();
+        const Eigen::Vector3d extent = model.bbox_max() - lo;
+        // Queries spread over the part and packed against its surface,
+        // where the boundary curves are.
+        std::mt19937_64 rng(7);
+        std::uniform_real_distribution<double> u01(0.0, 1.0);
+        std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> queries;
+        for (int i = 0; i < 160; ++i) {
+            const Eigen::Vector3d p =
+                lo - 0.05 * extent +
+                Eigen::Vector3d(u01(rng), u01(rng), u01(rng)).cwiseProduct(1.1 * extent);
+            const auto face = static_cast<std::uint32_t>(i % topo.faces.size());
+            queries.emplace_back(face, p);
+            if (const auto on = polymesh::geom::project_point_on_face(model, face, p)) {
+                const double s = 1e-3 * extent.norm() * u01(rng);
+                queries.emplace_back(face, on->point + s * Eigen::Vector3d(u01(rng) - 0.5,
+                                                                           u01(rng) - 0.5,
+                                                                           u01(rng) - 0.5));
+            }
+        }
+        using Answer = std::optional<polymesh::geom::ProjectResult>;
+        std::vector<Answer> cold(queries.size());
+        for (std::size_t k = 0; k < queries.size(); ++k) {
+            std::thread([&] {
+                cold[k] = polymesh::geom::project_point_on_face(model, queries[k].first,
+                                                                queries[k].second);
+            }).join();
+        }
+        std::size_t mismatched = 0;
+        for (int round = 0; round < 3; ++round) {
+            for (std::size_t k = 0; k < queries.size(); ++k) {
+                const Answer warm = polymesh::geom::project_point_on_face(
+                    model, queries[k].first, queries[k].second);
+                const bool same = warm.has_value() == cold[k].has_value() &&
+                                  (!warm || (warm->point == cold[k]->point &&
+                                             warm->distance == cold[k]->distance &&
+                                             warm->support_id == cold[k]->support_id));
+                mismatched += same ? 0 : 1;
+            }
+        }
+        INFO(path);
+        CHECK(mismatched == 0);
+    }
 }

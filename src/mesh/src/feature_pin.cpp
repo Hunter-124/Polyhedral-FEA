@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/feature_pin.hpp"
 #include "mesh/fill_progress.hpp"
+#include "mesh/parallel_progress.hpp"
 
 #include "geom/signal_fft.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace polymesh::mesh {
 
@@ -308,17 +312,24 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
         Eigen::Vector3d point = Eigen::Vector3d::Zero();
         std::uint32_t edge_id = 0;
     };
-    std::unordered_map<std::uint32_t, ChainPin> chain_target;
-    std::size_t n_chains = 0;
-    for (std::size_t work_done = 0; const auto& edge : topo.edges) {
-        if (active_fill_progress != nullptr)
-            fill_progress_poll(work_done++, topo.edges.size());
+    // Each edge's chain reads only node positions and `claimed`, neither of
+    // which changes until the targets are applied below, so the chains are
+    // built in parallel and merged in edge order, exactly as one serial walk
+    // would have recorded them (a later edge overwrites an earlier one).
+    struct EdgeChain {
+        std::vector<std::pair<std::uint32_t, ChainPin>> pins;
+        bool contributed = false;
+    };
+    std::vector<EdgeChain> edge_chains(topo.edges.size());
+    parallel_for_progress(topo.edges.size(), [&](std::size_t edge_index) {
+        const geom::CadEdge& edge = topo.edges[edge_index];
+        EdgeChain& result = edge_chains[edge_index];
         if (edge.feature != geom::CadEdgeFeature::kSharp || edge.samples.size() < 2) {
-            continue;
+            return;
         }
         const std::vector<double> stations = chord_stations(edge.samples);
         if (!(stations.back() > 0.0)) {
-            continue;
+            return;
         }
 
         struct Pinned {
@@ -326,9 +337,7 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
             double t;
         };
         std::vector<Pinned> chain;
-        for (std::size_t work_done = 0; const auto ni : candidates) {
-            if (active_fill_progress != nullptr)
-                fill_progress_poll(work_done++, candidates.size());
+        for (const auto ni : candidates) {
             if (claimed.count(ni) != 0) {
                 continue;
             }
@@ -340,7 +349,7 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
             chain.push_back({ni, t});
         }
         if (chain.empty()) {
-            continue;
+            return;
         }
         // Equal parameters are not hypothetical, and which way a tie falls is not
         // cosmetic: for a closed chain the re-spacing below hands each node the
@@ -385,9 +394,7 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
         }
 
         bool contributed = false;
-        for (std::size_t work_done = 0; const auto& pin : chain) {
-            if (active_fill_progress != nullptr)
-                fill_progress_poll(work_done++, chain.size());
+        for (const auto& pin : chain) {
             const Eigen::Vector3d seed = polyline_point(edge.samples, stations, pin.t);
             const auto exact = geom::project_point_on_edge(cad, edge.id, seed);
             if (!exact) {
@@ -414,10 +421,18 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
             if (mirror != nullptr) {
                 target = mirror->clamp_to_planes(target, nodes[pin.node]);
             }
-            chain_target.insert_or_assign(pin.node, ChainPin{target, edge.id});
+            result.pins.emplace_back(pin.node, ChainPin{target, edge.id});
             contributed = true;
         }
-        if (contributed) {
+        result.contributed = contributed;
+    });
+    std::unordered_map<std::uint32_t, ChainPin> chain_target;
+    std::size_t n_chains = 0;
+    for (const EdgeChain& result : edge_chains) {
+        for (const auto& [node, pin] : result.pins) {
+            chain_target.insert_or_assign(node, pin);
+        }
+        if (result.contributed) {
             ++n_chains;
         }
     }
@@ -505,14 +520,18 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     // and who owns it. This is the number the fidelity metric will report, so
     // measuring it here with the owner attached is what turns "the mesh is off
     // the CAD" into "this owner class could not be reached".
-    for (std::size_t work_done = 0; const auto ni : candidates) {
-        if (active_fill_progress != nullptr)
-            fill_progress_poll(work_done++, candidates.size());
-        const auto exact = geom::project_point_on_surface(cad, nodes[ni]);
-        if (!exact || exact->distance <= report.worst_node_distance) {
+    std::vector<std::optional<double>> census(candidates.size());
+    parallel_for_progress(candidates.size(), [&](std::size_t k) {
+        if (const auto exact = geom::project_point_on_surface(cad, nodes[candidates[k]])) {
+            census[k] = exact->distance;
+        }
+    });
+    for (std::size_t k = 0; k < candidates.size(); ++k) {
+        const auto ni = candidates[k];
+        if (!census[k] || *census[k] <= report.worst_node_distance) {
             continue;
         }
-        report.worst_node_distance = exact->distance;
+        report.worst_node_distance = *census[k];
         report.worst_node = ni;
         report.worst_node_owner = (provenance != nullptr && ni < provenance->size())
                                       ? (*provenance)[ni].kind

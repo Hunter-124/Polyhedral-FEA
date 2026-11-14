@@ -90,6 +90,16 @@ owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
                                  BoundaryProjectionContext* context,
                                  const MirrorFrame* mirror = nullptr);
 
+/// What owned_boundary_projection_target(p, node, ...) would return, without
+/// touching the owner table, so it may run on many nodes in parallel.
+/// `owner_kept` is false when the real call would change or restore the
+/// node's recorded owner; only a result with `owner_kept` true may stand in
+/// for the real call, which then has no side effect.
+[[nodiscard]] std::optional<BoundaryTarget>
+peek_owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
+                                      const BoundaryProjectionContext* context,
+                                      const MirrorFrame* mirror, bool& owner_kept);
+
 /// Resolve a node target through the exact owner-aware oracle when present,
 /// otherwise through the legacy TriSurface closest-point path. `mirror` as above.
 [[nodiscard]] std::optional<BoundaryTarget>

@@ -27,6 +27,7 @@
 #include "mesh/mirror.hpp"
 #include "mesh/mixed_fill.hpp"
 #include "mesh/octa_fill.hpp"
+#include "mesh/parallel_progress.hpp"
 #include "mesh/poly_mesh.hpp"
 #include "mesh/prism_fill.hpp"
 #include "mesh/quality.hpp"
@@ -2133,19 +2134,24 @@ static VolumeMeshOutput volume_mesh_impl(
     auto map_boundary_regions = [&] {
         mesh::fill_progress_phase("boundary_region_mapping");
         out.boundary_node_region.clear();
-        std::size_t boundary_poll = 0;
         std::set<std::uint32_t> boundary_nodes;
         for (const auto& quad : out.boundary_quads) {
             boundary_nodes.insert(quad.begin(), quad.end());
         }
-        for (const auto node : boundary_nodes) {
-            mesh::fill_progress_poll(boundary_poll, boundary_nodes.size());
-            if ((boundary_poll++ & 255U) == 0U) {
-                poll_cancel();
-            }
-            const auto cp = mesh::closest_on_surface(surf, out.mesh.nodes[node]);
+        // Each node's closest facet is independent of every other node's. The
+        // cancel callback belongs to the calling thread, so it is polled
+        // around the parallel lookup rather than inside it.
+        poll_cancel();
+        const std::vector<std::uint32_t> nodes(boundary_nodes.begin(), boundary_nodes.end());
+        std::vector<mesh::ClosestPoint> closest(nodes.size());
+        mesh::parallel_for_progress(nodes.size(), [&](std::size_t k) {
+            closest[k] = mesh::closest_on_surface(surf, out.mesh.nodes[nodes[k]]);
+        });
+        poll_cancel();
+        for (std::size_t k = 0; k < nodes.size(); ++k) {
+            const auto& cp = closest[k];
             if (cp.distance <= 1.5 * fill_h && cp.triangle < model.triangle_region.size()) {
-                out.boundary_node_region[node] = model.triangle_region[cp.triangle];
+                out.boundary_node_region[nodes[k]] = model.triangle_region[cp.triangle];
             }
         }
     };

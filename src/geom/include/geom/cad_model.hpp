@@ -173,6 +173,12 @@ project_point_on_face(const CadModel& model, std::uint32_t face_id, const Eigen:
 [[nodiscard]] std::optional<ProjectResult>
 project_point_on_edge(const CadModel& model, std::uint32_t edge_id, const Eigen::Vector3d& p);
 
+/// A lower bound on the distance from `p` to edge `edge_id`: no point that
+/// project_point_on_edge can return for it is closer. Cheap (a cached box), so
+/// callers can skip edges that cannot qualify. Zero when unknown.
+[[nodiscard]] double edge_distance_lower_bound(const CadModel& model, std::uint32_t edge_id,
+                                               const Eigen::Vector3d& p);
+
 /// Return the exact position of one stable CAD vertex.
 [[nodiscard]] std::optional<ProjectResult> project_point_on_vertex(const CadModel& model,
                                                                    std::uint32_t vertex_id,

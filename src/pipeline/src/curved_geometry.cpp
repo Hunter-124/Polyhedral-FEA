@@ -446,6 +446,12 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
                     if (topo_edge.feature != geom::CadEdgeFeature::kSharp) {
                         continue;
                     }
+                    // An edge whose box is farther than `tol` from either
+                    // corner cannot qualify; skip its two exact solves.
+                    if (geom::edge_distance_lower_bound(cad, topo_edge.id, qa) > tol ||
+                        geom::edge_distance_lower_bound(cad, topo_edge.id, qb) > tol) {
+                        continue;
+                    }
                     const auto pa = geom::project_point_on_edge(cad, topo_edge.id, qa);
                     const auto pb = geom::project_point_on_edge(cad, topo_edge.id, qb);
                     if (!pa || !pb) {

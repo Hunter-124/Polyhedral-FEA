@@ -9,6 +9,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass_FaceClassifier.hxx>
+#include <BRepClass_FaceExplorer.hxx>
 #include <BRepGProp.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Tool.hxx>
@@ -31,6 +32,8 @@
 #include <cstdint>
 #include <format>
 #include <vector>
+
+#include "uv_state_grid.hpp"
 
 #endif // POLYMESH_WITH_OCC
 
@@ -154,14 +157,21 @@ BRepSurfaceSamples sample_brep_surface(const CadModel& model, std::size_t max_sa
         }
     }
 
-    std::vector<Eigen::Vector3d>& samples = result.points;
-    result.face_ids.reserve(max_samples);
-    samples.reserve(max_samples);
-    for (std::size_t i = 0; i < face_count; ++i) {
+    // Faces are sampled independently (in parallel when OpenMP is on) and
+    // concatenated in face order; a face that yields nothing reports the same
+    // error the face-ordered serial walk would have raised first.
+    struct FaceSamples {
+        std::vector<Eigen::Vector3d> points;
+        std::size_t uv_attempts = 0;
+        bool fallback_vertex = false;
+        bool failed = false;
+    };
+    std::vector<FaceSamples> per_face(face_count);
+    const auto sample_face = [&](std::size_t i) {
+        FaceSamples& out = per_face[i];
         const TopoDS_Face face =
             TopoDS::Face(mapped_faces(static_cast<Standard_Integer>(i + 1)));
         const std::size_t quota = quotas[i];
-        const std::size_t before = samples.size();
 
         Standard_Real u_min = 0.0;
         Standard_Real u_max = 0.0;
@@ -179,21 +189,33 @@ BRepSurfaceSamples sample_brep_surface(const CadModel& model, std::size_t max_sa
             const std::size_t grid_side = static_cast<std::size_t>(
                 std::ceil(2.0 * std::sqrt(static_cast<double>(quota))));
             BRepAdaptor_Surface surface(face, Standard_True);
-            for (std::size_t v = 0; v < grid_side && samples.size() - before < quota; ++v) {
+            // BRepClass_FaceClassifier(face, uv, Confusion) on one kept
+            // explorer, answered from a UV state grid away from the boundary
+            // (about four attempts per cell).
+            BRepClass_FaceExplorer explorer(face);
+            explorer.SetMaxTolerance(0.1);
+            explorer.SetUseBndBox(Standard_False);
+            BRepClass_FaceClassifier classifier;
+            detail::UvStateGrid grid;
+            grid.build(face, Precision::Confusion(),
+                       static_cast<int>(grid_side * grid_side / 4));
+            const auto exact = [&](const gp_Pnt2d& uv) {
+                classifier.BRepClass_FClassifier::Perform(explorer, uv,
+                                                          Precision::Confusion());
+                return classifier.State();
+            };
+            for (std::size_t v = 0; v < grid_side && out.points.size() < quota; ++v) {
                 const double fv =
                     (static_cast<double>(v) + 0.5) / static_cast<double>(grid_side);
                 const Standard_Real param_v =
                     v_min + static_cast<Standard_Real>(fv) * (v_max - v_min);
-                for (std::size_t u = 0; u < grid_side && samples.size() - before < quota;
-                     ++u) {
+                for (std::size_t u = 0; u < grid_side && out.points.size() < quota; ++u) {
                     const double fu =
                         (static_cast<double>(u) + 0.5) / static_cast<double>(grid_side);
                     const Standard_Real param_u =
                         u_min + static_cast<Standard_Real>(fu) * (u_max - u_min);
-                    BRepClass_FaceClassifier classifier(face, gp_Pnt2d(param_u, param_v),
-                                                        Precision::Confusion());
-                    ++result.uv_attempt_count;
-                    const TopAbs_State state = classifier.State();
+                    ++out.uv_attempts;
+                    const TopAbs_State state = grid.classify(param_u, param_v, exact);
                     if (state != TopAbs_IN && state != TopAbs_ON) {
                         continue;
                     }
@@ -201,36 +223,72 @@ BRepSurfaceSamples sample_brep_surface(const CadModel& model, std::size_t max_sa
                     if (std::isfinite(static_cast<double>(point.X())) &&
                         std::isfinite(static_cast<double>(point.Y())) &&
                         std::isfinite(static_cast<double>(point.Z()))) {
-                        samples.emplace_back(point.X(), point.Y(), point.Z());
-                        result.face_ids.push_back(static_cast<std::uint32_t>(i));
+                        out.points.emplace_back(point.X(), point.Y(), point.Z());
                     }
                 }
             }
         }
 
-        if (samples.size() == before) {
+        if (out.points.empty()) {
             // Thin/degenerate trims can miss every bounded cell centre. A BRep
             // vertex remains an exact point on the trimmed face.
-            TopExp_Explorer vertices(face, TopAbs_VERTEX);
-            bool found_finite_vertex = false;
-            while (vertices.More()) {
+            for (TopExp_Explorer vertices(face, TopAbs_VERTEX); vertices.More();
+                 vertices.Next()) {
                 const gp_Pnt point = BRep_Tool::Pnt(TopoDS::Vertex(vertices.Current()));
                 if (std::isfinite(static_cast<double>(point.X())) &&
                     std::isfinite(static_cast<double>(point.Y())) &&
                     std::isfinite(static_cast<double>(point.Z()))) {
-                    samples.emplace_back(point.X(), point.Y(), point.Z());
-                    result.face_ids.push_back(static_cast<std::uint32_t>(i));
-                    found_finite_vertex = true;
-                    ++result.fallback_vertex_count;
-                    break;
+                    out.points.emplace_back(point.X(), point.Y(), point.Z());
+                    out.fallback_vertex = true;
+                    return;
                 }
-                vertices.Next();
             }
-            if (!found_finite_vertex) {
-                throw GeomError(std::format(
-                    "sample_brep_surface: face {} yielded no finite bounded exact sample", i));
-            }
+            out.failed = true;
         }
+    };
+#if defined(POLYMESH_WITH_OPENMP)
+    std::vector<char> threw(face_count, 0);
+#pragma omp parallel for schedule(dynamic, 1)
+    for (std::ptrdiff_t ii = 0; ii < static_cast<std::ptrdiff_t>(face_count); ++ii) {
+        try {
+            sample_face(static_cast<std::size_t>(ii));
+        } catch (...) {
+            threw[static_cast<std::size_t>(ii)] = 1;
+        }
+    }
+    // An OCC exception is rethrown from the first face that raised one, on the
+    // calling thread, exactly as the serial walk would have stopped there.
+    for (std::size_t i = 0; i < face_count; ++i) {
+        if (threw[i] != 0) {
+            per_face[i] = FaceSamples{};
+            sample_face(i);
+        }
+        if (per_face[i].failed) {
+            break;
+        }
+    }
+#else
+    for (std::size_t i = 0; i < face_count; ++i) {
+        sample_face(i);
+        if (per_face[i].failed) {
+            break;
+        }
+    }
+#endif
+
+    result.face_ids.reserve(max_samples);
+    result.points.reserve(max_samples);
+    for (std::size_t i = 0; i < face_count; ++i) {
+        const FaceSamples& face = per_face[i];
+        if (face.failed) {
+            throw GeomError(std::format(
+                "sample_brep_surface: face {} yielded no finite bounded exact sample", i));
+        }
+        result.uv_attempt_count += face.uv_attempts;
+        result.fallback_vertex_count += face.fallback_vertex ? 1 : 0;
+        result.points.insert(result.points.end(), face.points.begin(), face.points.end());
+        result.face_ids.insert(result.face_ids.end(), face.points.size(),
+                               static_cast<std::uint32_t>(i));
     }
     return result;
 }

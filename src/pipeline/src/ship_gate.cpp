@@ -14,6 +14,7 @@
 #include "mesh/feature_pin.hpp"
 #include "mesh/fill_progress.hpp"
 #include "mesh/mirror.hpp"
+#include "mesh/parallel_progress.hpp"
 #include "mesh/surface_project.hpp"
 
 #include <Eigen/Geometry>
@@ -24,6 +25,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <format>
 #include <limits>
 #include <map>
@@ -41,6 +43,12 @@
 namespace polymesh::pipeline {
 
 namespace {
+
+/// Bitwise position equality: a cached measurement is reused only for the
+/// exact coordinates it was taken at.
+bool same_position(const Eigen::Vector3d& a, const Eigen::Vector3d& b) {
+    return std::memcmp(a.data(), b.data(), 3 * sizeof(double)) == 0;
+}
 
 const char* geometry_volume_band(double relative_error) {
     if (relative_error > kGeometryVolumeHardLimit) {
@@ -516,10 +524,21 @@ ExteriorConformStats conform_true_exterior(
 
     std::vector<std::uint32_t> stuck;
     mesh::fill_progress_phase("exterior_projection");
-    std::size_t exterior_done = 0;
-    for (const auto ni : exterior) {
-        mesh::fill_progress_poll(exterior_done++, exterior.size());
-        const double start = free_distance(ni);
+    // `free_distance` depends only on where a node sits, and most exterior
+    // nodes already sit on the BRep and are skipped. Measure every node at its
+    // entry position in parallel; the march below reuses a measurement only
+    // while its node is still exactly there (an earlier march may have nudged
+    // it while opening room).
+    std::vector<Eigen::Vector3d> entry_at(exterior.size());
+    std::vector<double> entry_free(exterior.size(), 0.0);
+    mesh::parallel_for_progress(exterior.size(), [&](std::size_t k) {
+        entry_at[k] = mesh.nodes[exterior[k]];
+        entry_free[k] = free_distance(exterior[k]);
+    });
+    for (std::size_t k = 0; k < exterior.size(); ++k) {
+        const auto ni = exterior[k];
+        const double start =
+            same_position(mesh.nodes[ni], entry_at[k]) ? entry_free[k] : free_distance(ni);
         if (start <= eps) {
             continue;
         }
@@ -894,11 +913,7 @@ ExteriorConformStats conform_true_exterior(
             bool valid = false;
         };
         std::unordered_map<std::uint32_t, EdgeTarget> edge_target;
-        const auto target_of = [&](std::uint32_t node) {
-            const auto cached = edge_target.find(node);
-            if (cached != edge_target.end()) {
-                return cached->second;
-            }
+        const auto resolve_edge_target = [&](std::uint32_t node) {
             EdgeTarget target;
             if (const auto near = geom::closest_edge(*fit->topo, mesh.nodes[node], true)) {
                 if (near->distance <= 4.0 * h) {
@@ -910,6 +925,14 @@ ExteriorConformStats conform_true_exterior(
                     }
                 }
             }
+            return target;
+        };
+        const auto target_of = [&](std::uint32_t node) {
+            const auto cached = edge_target.find(node);
+            if (cached != edge_target.end()) {
+                return cached->second;
+            }
+            const EdgeTarget target = resolve_edge_target(node);
             edge_target.emplace(node, target);
             return target;
         };
@@ -929,6 +952,27 @@ ExteriorConformStats conform_true_exterior(
         }
         std::set<std::pair<std::uint32_t, std::uint32_t>> repaired;
         mesh::fill_progress_phase("exterior_edge_projection");
+        // A boundary node is moved here only after its target was cached (as
+        // an endpoint of an edge being repaired), so every target is measured
+        // at the node's entry position. Resolve them all in parallel first.
+        {
+            std::vector<std::uint32_t> endpoints;
+            endpoints.reserve(2 * boundary_edges.size());
+            for (const auto& [a, b] : boundary_edges) {
+                endpoints.push_back(a);
+                endpoints.push_back(b);
+            }
+            std::sort(endpoints.begin(), endpoints.end());
+            endpoints.erase(std::unique(endpoints.begin(), endpoints.end()), endpoints.end());
+            std::vector<EdgeTarget> resolved(endpoints.size());
+            mesh::parallel_for_progress(endpoints.size(), [&](std::size_t k) {
+                resolved[k] = resolve_edge_target(endpoints[k]);
+            });
+            edge_target.reserve(endpoints.size());
+            for (std::size_t k = 0; k < endpoints.size(); ++k) {
+                edge_target.emplace(endpoints[k], resolved[k]);
+            }
+        }
         std::size_t edges_done = 0;
         for (const auto& [a, b] : edge_order) {
             mesh::fill_progress_poll(edges_done++, edge_order.size());
@@ -1136,6 +1180,72 @@ ExteriorConformStats conform_true_exterior(
             // shared node array under a quality gate, so an accepted slide decides
             // whether the next one is legal.
             mesh::sort_mirror_canonical(mesh.nodes, candidates);
+            // The slide's owner projections dominate this sweep. Each one
+            // depends only on the slid point, so resolve every candidate's
+            // three relax rungs in parallel from the positions the sweep
+            // starts with; the sweep uses a result only when its slid point is
+            // bitwise the one resolved here (no earlier slide touched that
+            // node or its neighbours) and the real call would leave the owner
+            // record as it is.
+            constexpr std::array<double, 3> kRelax{0.5, 0.25, 0.125};
+            const auto umbrella_centroid = [&](std::uint32_t node, Eigen::Vector3d& out) {
+                // Umbrella centroid over the boundary neighbours only: an
+                // interior neighbour would pull the node off its own face.
+                Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+                std::size_t n_used = 0;
+                for (const auto fi : node_facets[node]) {
+                    const auto& f = facets[fi];
+                    for (int i = 0; i < f.count; ++i) {
+                        const auto other = f.nodes[static_cast<std::size_t>(i)];
+                        if (other != node) {
+                            sum += mesh.nodes[other];
+                            ++n_used;
+                        }
+                    }
+                }
+                if (n_used == 0) {
+                    return false;
+                }
+                out = sum / static_cast<double>(n_used);
+                return true;
+            };
+            struct SlideProbe {
+                Eigen::Vector3d query = Eigen::Vector3d::Zero();
+                std::optional<mesh::BoundaryTarget> target;
+                bool usable = false;
+            };
+            std::vector<std::array<SlideProbe, 3>> probes(candidates.size());
+            std::unordered_map<std::uint32_t, std::size_t> probe_of;
+            probe_of.reserve(candidates.size());
+            for (std::size_t k = 0; k < candidates.size(); ++k) {
+                probe_of.emplace(candidates[k], k);
+            }
+            mesh::parallel_for_progress(candidates.size(), [&](std::size_t k) {
+                const auto node = candidates[k];
+                Eigen::Vector3d centre;
+                if (!slidable(node) || !umbrella_centroid(node, centre)) {
+                    return;
+                }
+                const Eigen::Vector3d from = mesh.nodes[node];
+                for (std::size_t r = 0; r < kRelax.size(); ++r) {
+                    SlideProbe& probe = probes[k][r];
+                    probe.query = from + kRelax[r] * (centre - from);
+                    bool owner_kept = false;
+                    probe.target = mesh::peek_owned_boundary_projection_target(
+                        probe.query, node, projection, mirror, owner_kept);
+                    probe.usable = owner_kept;
+                }
+            });
+            const auto slide_target = [&](std::uint32_t node, std::size_t rung,
+                                          const Eigen::Vector3d& slid) {
+                if (const auto it = probe_of.find(node); it != probe_of.end()) {
+                    const SlideProbe& probe = probes[it->second][rung];
+                    if (probe.usable && same_position(probe.query, slid)) {
+                        return probe.target;
+                    }
+                }
+                return mesh::owned_boundary_projection_target(slid, node, projection, mirror);
+            };
             std::size_t moved = 0;
             std::vector<char> done(mesh.nodes.size(), 0);
             for (const auto ni : candidates) {
@@ -1174,25 +1284,10 @@ ExteriorConformStats conform_true_exterior(
                 bool have_centroids = true;
                 for (std::size_t gi = 0; gi < group.size(); ++gi) {
                     const auto node = group[gi];
-                    // Umbrella centroid over the boundary neighbours only: an
-                    // interior neighbour would pull the node off its own face.
-                    Eigen::Vector3d sum = Eigen::Vector3d::Zero();
-                    std::size_t n_used = 0;
-                    for (const auto fi : node_facets[node]) {
-                        const auto& f = facets[fi];
-                        for (int i = 0; i < f.count; ++i) {
-                            const auto other = f.nodes[static_cast<std::size_t>(i)];
-                            if (other != node) {
-                                sum += mesh.nodes[other];
-                                ++n_used;
-                            }
-                        }
-                    }
-                    if (n_used == 0) {
+                    if (!umbrella_centroid(node, centroid[gi])) {
                         have_centroids = false;
                         break;
                     }
-                    centroid[gi] = sum / static_cast<double>(n_used);
                     kink_before[gi] = node_worst_kink(node);
                     quality_before[gi] = star_min_quality(node);
                 }
@@ -1200,14 +1295,14 @@ ExteriorConformStats conform_true_exterior(
                     continue;
                 }
                 bool all_accepted = false;
-                for (const double relax : {0.5, 0.25, 0.125}) {
+                for (std::size_t rung = 0; rung < kRelax.size(); ++rung) {
+                    const double relax = kRelax[rung];
                     bool step_ok = true;
                     for (std::size_t gi = 0; gi < group.size() && step_ok; ++gi) {
                         const auto node = group[gi];
                         const Eigen::Vector3d slid =
                             group_saved[gi] + relax * (centroid[gi] - group_saved[gi]);
-                        const auto back = mesh::owned_boundary_projection_target(
-                            slid, node, projection, mirror);
+                        const auto back = slide_target(node, rung, slid);
                         if (!back) {
                             step_ok = false;
                             break;
@@ -1344,7 +1439,17 @@ void enforce_feature_resolution(const Model& model, VolumeMeshOutput& output,
     // an actual nearby boundary patch with a compatible normal. Point distance
     // alone cannot detect a vanished through-hole in a thin plate: its bore is
     // still close to the plate's top/bottom faces, whose normals are orthogonal.
-    std::vector<bool> face_has_patch(inspection.face_count, false);
+    //
+    // Whether a face has a patch is an OR over the boundary quads and each
+    // sample's distance enters a per-face max, so both are resolved in
+    // parallel (per face, quads are still tried in order and the scan stops at
+    // the first match, the same projections the serial quad-major walk made).
+    struct QuadProbe {
+        Eigen::Vector3d centroid;
+        Eigen::Vector3d normal;
+    };
+    std::vector<QuadProbe> quads;
+    quads.reserve(output.boundary_quads.size());
     for (const auto& face : output.boundary_quads) {
         const int n = face[3] == face[2] ? 3 : 4;
         Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
@@ -1360,19 +1465,41 @@ void enforce_feature_resolution(const Model& model, VolumeMeshOutput& output,
             continue;
         }
         normal /= normal_norm;
-        for (std::size_t face_id = 0; face_id < feature_face.size(); ++face_id) {
-            if (!feature_face[face_id] || face_has_patch[face_id]) {
-                continue;
-            }
-            const auto exact = geom::project_point_on_face(
-                *model.cad, static_cast<std::uint32_t>(face_id), centroid);
-            if (exact && exact->distance <= limit &&
-                std::abs(normal.dot(exact->normal)) >= kNormalMinDot) {
-                face_has_patch[face_id] = true;
-            }
+        quads.push_back({centroid, normal});
+    }
+    std::vector<std::uint32_t> wanted;
+    for (std::size_t face_id = 0; face_id < feature_face.size(); ++face_id) {
+        if (feature_face[face_id]) {
+            wanted.push_back(static_cast<std::uint32_t>(face_id));
         }
     }
+    std::vector<char> patch_found(wanted.size(), 0);
+    mesh::parallel_for_progress(
+        wanted.size(),
+        [&](std::size_t k) {
+            for (const QuadProbe& quad : quads) {
+                const auto exact =
+                    geom::project_point_on_face(*model.cad, wanted[k], quad.centroid);
+                if (exact && exact->distance <= limit &&
+                    std::abs(quad.normal.dot(exact->normal)) >= kNormalMinDot) {
+                    patch_found[k] = 1;
+                    return;
+                }
+            }
+        },
+        /*min_parallel=*/2);
+    std::vector<bool> face_has_patch(inspection.face_count, false);
+    for (std::size_t k = 0; k < wanted.size(); ++k) {
+        face_has_patch[wanted[k]] = patch_found[k] != 0;
+    }
 
+    std::vector<double> sample_distance(samples.points.size(), 0.0);
+    mesh::parallel_for_progress(samples.points.size(), [&](std::size_t i) {
+        if (i < samples.face_ids.size() && samples.face_ids[i] < inspection.face_count) {
+            sample_distance[i] =
+                mesh::closest_on_surface(boundary, samples.points[i]).distance;
+        }
+    });
     std::vector<double> face_distance(inspection.face_count, 0.0);
     std::vector<bool> sampled(inspection.face_count, false);
     for (std::size_t i = 0; i < samples.points.size(); ++i) {
@@ -1380,8 +1507,7 @@ void enforce_feature_resolution(const Model& model, VolumeMeshOutput& output,
             continue;
         }
         const auto face_id = samples.face_ids[i];
-        const double distance = mesh::closest_on_surface(boundary, samples.points[i]).distance;
-        face_distance[face_id] = std::max(face_distance[face_id], distance);
+        face_distance[face_id] = std::max(face_distance[face_id], sample_distance[i]);
         sampled[face_id] = true;
     }
 

@@ -271,15 +271,21 @@ void snap_round(GradedFillState& s) {
     // oracle does not exist and a node 0.01 hc off the facets is within facet
     // error, not stranded; rescuing it would move nodes onto facet noise.
     std::vector<std::uint32_t> stragglers;
+    // Read-only census: each node's target depends only on its own position.
+    std::vector<std::optional<BoundaryTarget>> resolved;
     if (projection != nullptr) {
+        const bool parallel = resolve_boundary_targets(surface, out.mesh.nodes, snap_nodes,
+                                                       projection, mirror, resolved);
         for (std::size_t work_done = 0; const auto ni : snap_nodes) {
-            if (active_fill_progress != nullptr)
-                fill_progress_poll(work_done++, snap_nodes.size());
+            const std::size_t k = work_done++;
+            if (!parallel && active_fill_progress != nullptr)
+                fill_progress_poll(k, snap_nodes.size());
             if (ni >= out.mesh.nodes.size()) {
                 continue;
             }
-            const auto target = boundary_projection_target(surface, out.mesh.nodes[ni], ni,
-                                                           projection, mirror);
+            const auto target = parallel ? resolved[k]
+                                         : boundary_projection_target(surface, out.mesh.nodes[ni],
+                                                                      ni, projection, mirror);
             if (target && target->distance > 0.01 * hc && target->distance <= 2.5 * hc) {
                 stragglers.push_back(ni);
             }
@@ -431,14 +437,20 @@ void snap_round(GradedFillState& s) {
     // Full projection; keep only if no skin tet inverts.
     {
         const double thr = 0.08 * hc;
+        // Each node moves only itself here, so every target can be resolved up
+        // front from the positions this loop starts with.
+        const bool parallel = resolve_boundary_targets(surface, out.mesh.nodes, snap_nodes,
+                                                       projection, mirror, resolved);
         for (std::size_t work_done = 0; auto ni : snap_nodes) {
-            if (active_fill_progress != nullptr)
-                fill_progress_poll(work_done++, snap_nodes.size());
+            const std::size_t k = work_done++;
+            if (!parallel && active_fill_progress != nullptr)
+                fill_progress_poll(k, snap_nodes.size());
             if (ni >= out.mesh.nodes.size()) {
                 continue;
             }
-            const auto target = boundary_projection_target(surface, out.mesh.nodes[ni], ni,
-                                                           projection, mirror);
+            const auto target = parallel ? resolved[k]
+                                         : boundary_projection_target(surface, out.mesh.nodes[ni],
+                                                                      ni, projection, mirror);
             if (!target || !(target->distance > thr) || target->distance > 2.5 * hc) {
                 continue;
             }

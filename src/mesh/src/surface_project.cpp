@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/surface_project.hpp"
 #include "mesh/fill_progress.hpp"
+#include "mesh/parallel_progress.hpp"
 
 #include <Eigen/Geometry>
 
@@ -378,6 +379,42 @@ void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
     });
 }
 
+void grow_boundary_owners(BoundaryProjectionContext* context,
+                          std::span<const std::uint32_t> ids) {
+    if (context == nullptr || context->provenance == nullptr || ids.empty()) {
+        return;
+    }
+    const std::uint32_t top = *std::max_element(ids.begin(), ids.end());
+    if (context->provenance->size() <= top) {
+        context->provenance->resize(static_cast<std::size_t>(top) + 1);
+    }
+}
+
+bool resolve_boundary_targets(const geom::TriSurface& surface,
+                              const std::vector<Eigen::Vector3d>& nodes,
+                              std::span<const std::uint32_t> ids,
+                              BoundaryProjectionContext* context, const MirrorFrame* mirror,
+                              std::vector<std::optional<BoundaryTarget>>& out) {
+    out.clear();
+    if (context == nullptr || !context->target) {
+        return false;
+    }
+    std::vector<std::uint32_t> sorted(ids.begin(), ids.end());
+    std::sort(sorted.begin(), sorted.end());
+    if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end()) {
+        return false;
+    }
+    grow_boundary_owners(context, ids);
+    out.assign(ids.size(), std::nullopt);
+    parallel_for_progress(ids.size(), [&](std::size_t k) {
+        const auto ni = ids[k];
+        if (ni < nodes.size()) {
+            out[k] = boundary_projection_target(surface, nodes[ni], ni, context, mirror);
+        }
+    });
+    return true;
+}
+
 SnapStats
 snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
                     const std::vector<std::uint32_t>& boundary_nodes, double h,
@@ -410,11 +447,41 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
 
     stats.n_candidates = boundary_nodes.size();
 
+    // An exact-oracle target depends only on the node's own position and owner,
+    // so each pass resolves every target in parallel and then applies the moves
+    // in order, exactly as the serial loop did. A repeated node would see its
+    // own earlier move within a pass, so such a list stays serial.
+    const bool exact_oracle = projection != nullptr && projection->target;
+    bool parallel_targets = exact_oracle;
+    if (parallel_targets) {
+        std::vector<std::uint32_t> sorted(boundary_nodes.begin(), boundary_nodes.end());
+        std::sort(sorted.begin(), sorted.end());
+        parallel_targets = std::adjacent_find(sorted.begin(), sorted.end()) == sorted.end();
+        // The owner table grows on first touch; grow it once here instead of
+        // from several threads.
+        if (parallel_targets && projection->provenance != nullptr && !sorted.empty() &&
+            projection->provenance->size() <= sorted.back()) {
+            projection->provenance->resize(static_cast<std::size_t>(sorted.back()) + 1);
+        }
+    }
+    std::vector<std::optional<BoundaryTarget>> resolved;
+
     for (int pass = 0; pass < passes; ++pass) {
         fill_progress_phase("projection_pass", pass + 1, passes);
+        if (parallel_targets) {
+            resolved.assign(boundary_nodes.size(), std::nullopt);
+            parallel_for_progress(boundary_nodes.size(), [&](std::size_t k) {
+                const auto ni = boundary_nodes[k];
+                if (ni < nodes.size()) {
+                    resolved[k] =
+                        boundary_projection_target(surface, nodes[ni], ni, projection, mirror);
+                }
+            });
+        }
         for (std::size_t work_done = 0; auto ni : boundary_nodes) {
-            if (active_fill_progress != nullptr)
-                fill_progress_poll(work_done++, boundary_nodes.size());
+            const std::size_t k = work_done++;
+            if (!parallel_targets && active_fill_progress != nullptr)
+                fill_progress_poll(k, boundary_nodes.size());
             if (ni >= nodes.size()) {
                 continue;
             }
@@ -428,9 +495,11 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             // or sampled feature target: doing so could move an owned node
             // across a trimmed face or sharp edge when its exact projection
             // temporarily fails.
-            if (projection != nullptr && projection->target) {
+            if (exact_oracle) {
                 const auto exact =
-                    boundary_projection_target(surface, p, ni, projection, mirror);
+                    parallel_targets
+                        ? resolved[k]
+                        : boundary_projection_target(surface, p, ni, projection, mirror);
                 if (exact && exact->distance > 1e-15 && exact->distance <= search_r) {
                     target = exact->point;
                     dist = exact->distance;
@@ -1026,6 +1095,11 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         }
     }
     const bool exact_owners = projection != nullptr && projection->target;
+    // nbr_ids are distinct map keys and an exact owner depends only on its own
+    // node, so classification and the Jacobi targets below resolve in parallel.
+    std::vector<std::optional<BoundaryTarget>> classified;
+    const bool parallel_smooth =
+        resolve_boundary_targets(surface, nodes, nbr_ids, projection, mirror, classified);
     for (std::size_t work_done = 0; const auto ni : nbr_ids) {
         if (active_fill_progress != nullptr)
             fill_progress_poll(work_done++, nbr_ids.size());
@@ -1033,7 +1107,9 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         if (exact_owners) {
             // Classification is a side effect of the first exact target query;
             // the point itself is not moved during this setup pass.
-            (void)boundary_projection_target(surface, nodes[ni], ni, projection, mirror);
+            if (!parallel_smooth) {
+                (void)boundary_projection_target(surface, nodes[ni], ni, projection, mirror);
+            }
             if (projection->provenance != nullptr && ni < projection->provenance->size()) {
                 const BoundarySupport owner = (*projection->provenance)[ni];
                 if (owner.kind == BoundarySupportKind::kCadVertex) {
@@ -1087,16 +1163,14 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     for (int pass = 0; pass < passes; ++pass) {
         fill_progress_phase("quality_smoothing_pass", pass + 1, passes);
         refresh_face_measures();
-        // Jacobi targets from the current state.
-        std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> targets;
-        targets.reserve(nbr.size());
-        for (std::size_t work_done = 0; const auto ni : nbr_ids) {
-            if (active_fill_progress != nullptr)
-                fill_progress_poll(work_done++, nbr_ids.size());
+        // Jacobi targets from the current state: each node's target reads only
+        // the pass snapshot, so with the exact oracle they resolve in parallel
+        // and are gathered in node order exactly as the serial loop did.
+        const auto smooth_target = [&](std::uint32_t ni) -> std::optional<Eigen::Vector3d> {
             const auto& nb = nbr.at(ni);
             const Kind k = kind[ni];
             if (k == Kind::kFrozen || nb.empty()) {
-                continue;
+                return std::nullopt;
             }
             Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
             std::size_t n_used = 0;
@@ -1110,12 +1184,12 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
                     }
                 }
                 if (cn.size() != 2) {
-                    continue;
+                    return std::nullopt;
                 }
                 const Eigen::Vector3d d0 = (nodes[cn[0]] - nodes[ni]).normalized();
                 const Eigen::Vector3d d1 = (nodes[cn[1]] - nodes[ni]).normalized();
                 if (d0.dot(d1) > -0.5) {
-                    continue; // sharper than 120° in-chain: corner, keep
+                    return std::nullopt; // sharper than 120° in-chain: corner, keep
                 }
                 centroid = 0.5 * (nodes[cn[0]] + nodes[cn[1]]);
                 n_used = 2;
@@ -1142,7 +1216,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
                 // equal spacing.
                 const auto it = inc.find(ni);
                 if (it == inc.end()) {
-                    continue;
+                    return std::nullopt;
                 }
                 Eigen::Vector3d moment = Eigen::Vector3d::Zero();
                 double area_sum = 0.0;
@@ -1155,13 +1229,13 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
                     area_sum += area;
                 }
                 if (!(area_sum > 0.0)) {
-                    continue;
+                    return std::nullopt;
                 }
                 centroid = moment / area_sum;
                 n_used = it->second.size();
             }
             if (n_used == 0) {
-                continue;
+                return std::nullopt;
             }
             Eigen::Vector3d p = nodes[ni] + relax * (centroid - nodes[ni]);
             // Re-project so travel is tangential. Exact owners are always
@@ -1170,27 +1244,45 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
                 const auto target =
                     boundary_projection_target(surface, p, ni, projection, mirror);
                 if (!target || target->distance > 0.75 * h) {
-                    continue;
+                    return std::nullopt;
                 }
                 p = target->point;
             } else if (k == Kind::kCrease) {
                 const auto cf =
                     geom::closest_on_features(mirror_fold(mirror, p), surface, feature_edges);
                 if (!std::isfinite(cf.distance)) {
-                    continue;
+                    return std::nullopt;
                 }
                 p = mirror_unfold(mirror, cf.point, p);
             } else {
                 const auto cp = closest_on_surface(surface, mirror_fold(mirror, p));
                 if (cp.distance > 0.75 * h) {
-                    continue; // projection ran away — keep the node
+                    return std::nullopt; // projection ran away — keep the node
                 }
                 p = mirror_unfold(mirror, cp.point, p);
             }
             if ((p - nodes[ni]).squaredNorm() <= 1e-30) {
-                continue;
+                return std::nullopt;
             }
-            targets.push_back({ni, p});
+            return p;
+        };
+        std::vector<std::optional<Eigen::Vector3d>> slot(nbr_ids.size());
+        if (parallel_smooth) {
+            parallel_for_progress(nbr_ids.size(),
+                                  [&](std::size_t i) { slot[i] = smooth_target(nbr_ids[i]); });
+        } else {
+            for (std::size_t i = 0; i < nbr_ids.size(); ++i) {
+                if (active_fill_progress != nullptr)
+                    fill_progress_poll(i, nbr_ids.size());
+                slot[i] = smooth_target(nbr_ids[i]);
+            }
+        }
+        std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> targets;
+        targets.reserve(nbr.size());
+        for (std::size_t i = 0; i < nbr_ids.size(); ++i) {
+            if (slot[i]) {
+                targets.push_back({nbr_ids[i], *slot[i]});
+            }
         }
         if (targets.empty()) {
             break;

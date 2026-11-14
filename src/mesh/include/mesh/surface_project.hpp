@@ -97,6 +97,23 @@ boundary_projection_target(const geom::TriSurface& surface, const Eigen::Vector3
                            std::uint32_t node, BoundaryProjectionContext* context = nullptr,
                            const MirrorFrame* mirror = nullptr);
 
+/// Grow the owner table to cover every id in `ids` before parallel workers
+/// classify them (each worker then writes only its own slot).
+void grow_boundary_owners(BoundaryProjectionContext* context,
+                          std::span<const std::uint32_t> ids);
+
+/// Resolve exact-oracle targets for `ids` at their current `nodes` positions,
+/// in parallel; out[k] is the target of ids[k] (nullopt when out of range or
+/// unresolved). Owners classify as in boundary_projection_target. Returns false
+/// and leaves `out` empty when no exact oracle is installed or an id repeats,
+/// so the caller keeps its serial path.
+[[nodiscard]] bool resolve_boundary_targets(const geom::TriSurface& surface,
+                                            const std::vector<Eigen::Vector3d>& nodes,
+                                            std::span<const std::uint32_t> ids,
+                                            BoundaryProjectionContext* context,
+                                            const MirrorFrame* mirror,
+                                            std::vector<std::optional<BoundaryTarget>>& out);
+
 /// Result of a Jacobian-safe boundary snap.
 struct SnapStats {
     std::size_t n_candidates = 0;

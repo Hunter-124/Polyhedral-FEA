@@ -14,6 +14,7 @@
 #include "mesh/fill_progress.hpp"
 #include "mesh/local_refine.hpp"
 #include "mesh/mirror.hpp"
+#include "mesh/parallel_progress.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 
@@ -389,17 +390,11 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     const double volume_epsilon = 1e-14 * h * h * h;
     const double jacobian_epsilon = 1e-8 * h * h * h;
     std::size_t projected = 0;
-    mesh::fill_progress_phase("quadratic_boundary_projection");
-    std::size_t mids_done = 0;
-    for (const auto& edge : boundary_mids) {
-        mesh::fill_progress_poll(mids_done++, boundary_mids.size());
-        if (edge.a >= nodal_mesh.nodes.size() || edge.b >= nodal_mesh.nodes.size() ||
-            edge.mid >= nodal_mesh.nodes.size()) {
-            if (reverted_nodes != nullptr) {
-                reverted_nodes->push_back(edge.mid);
-            }
-            continue;
-        }
+    // A mid's target depends only on its own position and its two corner nodes,
+    // and this loop moves only mids, so every target is resolved up front (in
+    // parallel when each mid appears once) and the line searches below apply
+    // them in the mirror-canonical order exactly as before.
+    const auto resolve_target = [&](const auto& edge) -> std::optional<mesh::BoundaryTarget> {
         const Eigen::Vector3d saved = nodal_mesh.nodes[edge.mid];
         const auto owner_a = owner_of(edge.a);
         const auto owner_b = owner_of(edge.b);
@@ -480,6 +475,50 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
                                                                 mirror);
             }
         }
+        return target;
+    };
+    const auto in_range = [&](const auto& edge) {
+        return edge.a < nodal_mesh.nodes.size() && edge.b < nodal_mesh.nodes.size() &&
+               edge.mid < nodal_mesh.nodes.size();
+    };
+    std::vector<std::optional<mesh::BoundaryTarget>> resolved;
+    bool parallel_targets = false;
+    {
+        std::vector<std::uint32_t> mids;
+        mids.reserve(boundary_mids.size());
+        for (const auto& edge : boundary_mids) {
+            mids.push_back(edge.mid);
+        }
+        std::sort(mids.begin(), mids.end());
+        parallel_targets = std::adjacent_find(mids.begin(), mids.end()) == mids.end();
+        // Owners grow on first touch; grow the table once instead of from workers.
+        if (parallel_targets && projection->provenance != nullptr && !mids.empty() &&
+            projection->provenance->size() <= mids.back()) {
+            projection->provenance->resize(static_cast<std::size_t>(mids.back()) + 1);
+        }
+    }
+    mesh::fill_progress_phase("quadratic_boundary_projection");
+    if (parallel_targets) {
+        resolved.assign(boundary_mids.size(), std::nullopt);
+        mesh::parallel_for_progress(boundary_mids.size(), [&](std::size_t k) {
+            if (in_range(boundary_mids[k])) {
+                resolved[k] = resolve_target(boundary_mids[k]);
+            }
+        });
+    }
+    std::size_t mids_done = 0;
+    for (const auto& edge : boundary_mids) {
+        mesh::fill_progress_poll(mids_done++, boundary_mids.size());
+        if (edge.a >= nodal_mesh.nodes.size() || edge.b >= nodal_mesh.nodes.size() ||
+            edge.mid >= nodal_mesh.nodes.size()) {
+            if (reverted_nodes != nullptr) {
+                reverted_nodes->push_back(edge.mid);
+            }
+            continue;
+        }
+        const Eigen::Vector3d saved = nodal_mesh.nodes[edge.mid];
+        const std::optional<mesh::BoundaryTarget> target =
+            parallel_targets ? resolved[mids_done - 1] : resolve_target(edge);
         if (!target) {
             if (reverted_nodes != nullptr) {
                 reverted_nodes->push_back(edge.mid);
